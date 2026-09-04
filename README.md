@@ -1,3 +1,5 @@
+**English** · [한국어](README.ko.md)
+
 # Self-Improving Harness
 
 A build kit for the *environment* an AI coding agent works in — not for the agent, and not for the model.
@@ -7,9 +9,9 @@ sets that turn an agent's failures into changes to the system that produced them
 itself, and it verifies itself with its own tooling.
 
 > **Note on language.** The bundle's documents are written in Korean, because they are the normative
-> artifacts a Korean-speaking team reads while working. This README is the English overview and map.
-> Every Korean document linked below is the canonical owner of what it describes; this page does not
-> duplicate their content.
+> artifacts a Korean-speaking team reads while working. This README is the English overview and map;
+> [README.ko.md](README.ko.md) is the same page in Korean. Every document linked below is the
+> canonical owner of what it describes, and neither README duplicates their content.
 
 ---
 
