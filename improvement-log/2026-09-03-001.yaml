@@ -1,0 +1,31 @@
+# improvement log 후보입니다. 사양 6.5 의 키 순서를 바꾸지 않습니다.
+id: 2026-09-03-001
+date: 2026-09-03
+status: candidate
+symptom: 언어 팩 분리 후 guard-evaluation-tampering.sh 의 언어별 보호가 스택 감지 성공에 의존하게 되어, 감지가 실패하거나 어긋나는 저장소에서 lint·타입·아키텍처 설정 파일이 조용히 무방비가 되었습니다.
+evidence: |
+  네 개의 리뷰 에이전트 중 셋이 독립적으로 같은 근본 원인에 도달했습니다. fixture 로 재현한 경로는 다섯 갈래입니다.
+  1) 루트에 매니페스트가 없는 저장소(지원하지 않는 언어 포함): eslint.config.js / tsconfig.json / checkstyle.xml / ruff.toml 모두 exit 0 (변경 전에는 exit 2).
+  2) monorepo: pom.xml 루트에서 frontend/tsconfig.json exit 0. package.json 루트에서 backend/checkstyle.xml exit 0.
+  3) polyglot 단일 루트(package.json + pyproject.toml): 먼저 감지된 typescript 만 보호되고 ruff.toml / mypy.ini / .importlinter 는 exit 0.
+  4) 루트에 {"name":"x"} 만 담은 package.json 을 만들면 Java 프로젝트의 checkstyle.xml / archunit.properties 가 exit 0 으로 바뀜. 도구 호출 두 번으로 완결됨.
+  5) 팩이 계약을 어기거나 language/ 가 손상되면 hook 이 아무 경고 없이 코어 목록만 적용하고 통과.
+  추가로 hook 이 load_config 로 프로젝트의 harness.config 를 source 하므로, Bash 로 'exit 0' 한 줄을 덧붙이면 가드 전체가 무력화되고 가드 프로세스 안에서 임의 명령이 실행되었습니다(PreToolUse matcher 는 Edit|Write|MultiEdit|NotebookEdit 뿐이라 Bash 경로가 열려 있습니다).
+  근거 리뷰: 평가 무결성 리뷰 S1~S7, 셸 정확성 리뷰 H1~H2.
+root_cause: 언어별 관심사를 팩으로 분리하면서 보호 목록 병합까지 감지 결과에 연결했습니다. 감지는 단계 선택을 위한 최선 추정이지 보안 경계의 입력이 아닌데 둘을 같은 신호에 묶었고, 감지 실패를 fail-open 으로 설계해 열화 상태가 관측되지 않았습니다.
+fix: 보호 패턴과 보안 경로 병합을 감지에서 분리해 로드된 모든 팩의 합집합을 쓰도록 바꾸고, hook 에서 harness.config source 를 제거했으며, 팩을 하나도 로드하지 못했거나 계약 위반이 있으면 매 호출 stderr 로 알리게 했습니다.
+recurrence_risk: high
+harness_element: HE-10
+proposed_harness_change: 보안 경계의 입력은 최선 추정에 의존시키지 않습니다. 탐지 결과로 보호 범위를 좁히는 설계를 도입할 때는 탐지 실패 시 범위가 넓어지는 쪽(fail-closed)으로 기울이고, 열화 상태를 매 호출 관측 가능하게 만듭니다.
+preferred_enforcement: hook
+trust: untrusted
+regression_check: |
+  대상: REP-3(게이트 약화 검출), REP-7(외부 입력 신뢰 경계), HLD-5(보안 민감 변경)
+  기준: 스택 미감지·monorepo·polyglot·kind 오판정·package.json 주입 다섯 상황 전부에서 언어별 보호 파일이 차단될 것.
+        harness.config 에 exit 0 / HARNESS_ALLOW_GUARDED_EDIT=1 / 임의 명령을 넣어도 차단이 유지될 것.
+  수행한 검증: fixture 기반 보호 판정 단언 28건 전부 통과. 차단 패턴 12개 → 72개.
+                harness.config 공격 4종 전부 exit 2 유지, 임의 명령 미실행 확인.
+  남은 것: 이 저장소에는 REP-*/HLD-* 과제가 플레이스홀더 상태라 대표·held-out 평가를 실행하지 못했습니다.
+           승격하려면 그 과제 세트를 먼저 실체화해야 합니다.
+owner: unassigned
+expires: 2026-12-03

@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="BASELINE.md에서 Context를, Context에서 코드를 만드는 3층 구조와 baseline 스킬의 동작 방식">
+<style>
+  /* Artifact 런타임이 제공하던 최소 리셋 — 단독 파일용 */
+  :root{color-scheme:light dark}
+  html,body{margin:0}
+  img{max-width:100%}
+  [hidden]{display:none!important}
+</style>
+<title>잠긴 기준, 열린 디테일</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@300;400;500;600&display=swap">
+<style>
+  :root{
+    --paper:#F2F2EE;
+    --panel:#E9E9E3;
+    --ink:#141412;
+    --ink-2:#6B6B62;
+    --ink-3:#85857B;
+    --rule:#CFCFC6;
+    --signal:#C8102E;
+    --sans:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+    --disp:"Archivo","IBM Plex Sans KR",system-ui,sans-serif;
+    --mono:"IBM Plex Mono","SFMono-Regular",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#131312;
+      --panel:#1C1C1A;
+      --ink:#ECECE4;
+      --ink-2:#9B9B90;
+      --ink-3:#75756B;
+      --rule:#33332E;
+      --signal:#FF4F42;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#131312;
+    --panel:#1C1C1A;
+    --ink:#ECECE4;
+    --ink-2:#9B9B90;
+    --ink-3:#75756B;
+    --rule:#33332E;
+    --signal:#FF4F42;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-weight:400;
+    font-size:16px;
+    line-height:1.75;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:64rem;margin:0 auto;padding:0 2rem 7rem}
+
+  /* ---------- masthead ---------- */
+  .mast{padding:5rem 0 2.5rem;border-bottom:2px solid var(--ink)}
+  .eyebrow{
+    font-family:var(--mono);font-size:.75rem;font-weight:500;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);
+    display:flex;gap:.85rem;align-items:baseline;flex-wrap:wrap;
+  }
+  .eyebrow .sep{color:var(--rule)}
+  h1{
+    font-family:var(--sans);font-weight:600;
+    font-size:clamp(2.5rem,7vw,4.5rem);
+    line-height:1.06;letter-spacing:-.035em;
+    margin:1.6rem 0 0;text-wrap:balance;
+  }
+  h1 .open{color:var(--signal)}
+  .deck{
+    margin:1.75rem 0 0;max-width:35rem;
+    font-size:1.0625rem;font-weight:300;line-height:1.7;color:var(--ink-2);
+  }
+  .deck b{font-weight:500;color:var(--ink)}
+
+  .facts{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(7rem,1fr));
+    gap:0;margin-top:3rem;border-top:1px solid var(--rule);
+  }
+  .fact{padding:1rem 1rem 1rem 0;border-right:1px solid var(--rule)}
+  .fact:last-child{border-right:0}
+  .fact dt{
+    font-family:var(--mono);font-size:.6875rem;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--ink-3);margin:0 0 .35rem;
+  }
+  .fact dd{
+    margin:0;font-family:var(--disp);font-weight:700;font-size:1.5rem;
+    letter-spacing:-.02em;font-variant-numeric:tabular-nums;
+  }
+
+  /* ---------- section grid ---------- */
+  .sec{
+    display:grid;grid-template-columns:7rem minmax(0,1fr);
+    column-gap:3rem;row-gap:0;
+    padding:4rem 0 3.5rem;border-bottom:1px solid var(--rule);
+  }
+  .rail{display:flex;flex-direction:column;gap:.3rem;padding-top:.35rem}
+  .rail .num{
+    font-family:var(--disp);font-weight:800;font-size:1.75rem;
+    line-height:1;color:var(--ink-3);font-variant-numeric:tabular-nums;
+  }
+  .rail .tag{
+    font-family:var(--mono);font-size:.6875rem;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--ink-3);
+  }
+  .col{min-width:0}
+  h2{
+    font-size:clamp(1.5rem,3vw,1.9rem);font-weight:600;letter-spacing:-.025em;
+    line-height:1.25;margin:0 0 1rem;text-wrap:balance;
+  }
+  h3{
+    font-size:.9375rem;font-weight:600;letter-spacing:-.005em;
+    margin:2.5rem 0 .75rem;
+  }
+  p{margin:0 0 1.1rem;max-width:38rem}
+  p:last-child{margin-bottom:0}
+  .sum{
+    font-size:1.125rem;font-weight:400;line-height:1.65;letter-spacing:-.012em;
+    margin:0 0 1.5rem;max-width:34rem;
+  }
+  .body{color:var(--ink-2);font-weight:300}
+  .body b{font-weight:500;color:var(--ink)}
+  code{
+    font-family:var(--mono);font-size:.875em;
+    background:var(--panel);padding:.1em .35em;border-radius:2px;
+  }
+  strong{font-weight:600}
+
+  /* ---------- statement ---------- */
+  .stmt{
+    font-family:var(--sans);font-weight:300;
+    font-size:clamp(1.4rem,3.4vw,2rem);line-height:1.4;letter-spacing:-.025em;
+    margin:0 0 2rem;max-width:32rem;text-wrap:balance;
+  }
+  .stmt b{font-weight:600}
+
+  /* ---------- lists ---------- */
+  .rules{list-style:none;margin:0;padding:0;display:grid;gap:0}
+  .rules li{
+    display:grid;grid-template-columns:2.25rem minmax(0,1fr);
+    gap:1rem;padding:1rem 0;border-top:1px solid var(--rule);
+  }
+  .rules li:last-child{border-bottom:1px solid var(--rule)}
+  .rules .k{
+    font-family:var(--mono);font-size:.75rem;color:var(--ink-3);
+    padding-top:.28rem;font-variant-numeric:tabular-nums;
+  }
+  .rules .t{margin:0;max-width:36rem}
+  .rules .t b{display:block;font-weight:600;margin-bottom:.15rem}
+  .rules .t span{color:var(--ink-2);font-size:.9375rem;font-weight:300}
+  .rules.deny .k{color:var(--signal)}
+
+  /* ---------- layer cards ---------- */
+  .layers{display:grid;gap:0;margin-top:2.5rem}
+  .layer{
+    display:grid;grid-template-columns:6.5rem minmax(0,1fr) minmax(0,1fr);
+    gap:1.5rem;padding:1.5rem 0;border-top:1px solid var(--rule);
+  }
+  .layer:last-child{border-bottom:1px solid var(--rule)}
+  .layer .name{
+    font-family:var(--disp);font-weight:800;font-size:1.0625rem;
+    letter-spacing:.01em;line-height:1.3;
+  }
+  .layer .state{
+    display:block;font-family:var(--mono);font-weight:400;
+    font-size:.6875rem;letter-spacing:.08em;margin-top:.35rem;color:var(--ink-2);
+  }
+  .layer.locked .state::before{
+    content:"";display:inline-block;width:.5rem;height:.5rem;
+    background:var(--ink);margin-right:.4rem;vertical-align:.02rem;
+  }
+  .layer.open .state{color:var(--signal)}
+  .layer.open .state::before{
+    content:"";display:inline-block;width:.5rem;height:.5rem;
+    border:1px solid var(--signal);margin-right:.4rem;vertical-align:.02rem;
+  }
+  .layer .lab{
+    font-family:var(--mono);font-size:.6875rem;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--ink-3);margin:0 0 .45rem;
+  }
+  .layer ul{margin:0;padding-left:1rem;font-size:.9375rem;line-height:1.6}
+  .layer li{margin-bottom:.25rem}
+  .layer .no{color:var(--ink-2)}
+
+  /* ---------- open / shut definitions ---------- */
+  .defs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;margin:0 0 2rem}
+  .def{padding:1.5rem 1.75rem 1.5rem 0;border-top:2px solid var(--ink)}
+  .def+.def{padding:1.5rem 0 1.5rem 1.75rem;border-left:1px solid var(--rule)}
+  .def .mk{
+    display:block;font-family:var(--mono);font-size:.6875rem;letter-spacing:.08em;
+    color:var(--ink-2);margin-bottom:.55rem;
+  }
+  .def.shut .mk::before{
+    content:"";display:inline-block;width:.5rem;height:.5rem;
+    background:var(--ink);margin-right:.45rem;vertical-align:.02rem;
+  }
+  .def.free .mk{color:var(--signal)}
+  .def.free .mk::before{
+    content:"";display:inline-block;width:.5rem;height:.5rem;
+    border:1px solid var(--signal);margin-right:.45rem;vertical-align:.02rem;
+  }
+  .def .ttl{font-size:1.1875rem;font-weight:600;letter-spacing:-.02em;margin:0 0 .9rem}
+  .def ul{margin:0;padding-left:1rem;font-size:.9375rem;line-height:1.65;color:var(--ink-2)}
+  .def li{margin-bottom:.4rem}
+  .def li:last-child{margin-bottom:0}
+  .def li b{font-weight:500;color:var(--ink)}
+
+  /* ---------- worked example ---------- */
+  .walk{display:grid;gap:0;margin:0}
+  .step{
+    display:grid;grid-template-columns:7.5rem minmax(0,1fr);
+    gap:1.5rem;padding:1.5rem 0;border-top:1px solid var(--rule);
+  }
+  .step:last-child{border-bottom:1px solid var(--rule)}
+  .step .who{
+    font-family:var(--disp);font-weight:800;font-size:.9375rem;letter-spacing:.01em;
+  }
+  .step .who span{
+    display:block;font-family:var(--mono);font-weight:400;font-size:.6875rem;
+    letter-spacing:.08em;color:var(--ink-2);margin-top:.3rem;
+  }
+  .step .says{
+    margin:0 0 .75rem;font-size:1rem;line-height:1.65;max-width:34rem;
+  }
+  .step .meta{
+    margin:0;font-size:.875rem;line-height:1.6;color:var(--ink-2);
+    font-weight:300;max-width:34rem;
+  }
+  .step .meta b{font-weight:500;color:var(--ink)}
+  .quote{
+    font-family:var(--mono);font-size:.8125rem;line-height:1.7;
+    background:var(--panel);padding:.75rem .9rem;margin:0 0 .75rem;
+    border-left:2px solid var(--rule);max-width:34rem;
+  }
+
+  /* ---------- figure ---------- */
+  figure{margin:0 0 2.5rem;padding:0}
+  .figbox{
+    background:var(--panel);border:1px solid var(--rule);
+    padding:1.75rem 1.5rem;overflow-x:auto;
+  }
+  .figbox svg{display:block;width:100%;height:auto;color:var(--ink);min-width:30rem}
+  .figbox .sg{fill:var(--signal)}
+  .figbox .sg-s{stroke:var(--signal)}
+  figcaption{
+    margin-top:.9rem;font-size:.8125rem;line-height:1.6;color:var(--ink-2);
+    max-width:36rem;
+  }
+  figcaption b{color:var(--ink);font-weight:500}
+
+  /* ---------- tables ---------- */
+  .tw{overflow-x:auto;margin:0 0 1.5rem}
+  table{
+    width:100%;border-collapse:collapse;font-size:.875rem;
+    min-width:34rem;font-variant-numeric:tabular-nums;
+  }
+  th{
+    text-align:left;font-family:var(--mono);font-weight:500;
+    font-size:.6875rem;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--ink-3);padding:0 1.25rem .6rem 0;
+    border-bottom:1px solid var(--ink);vertical-align:bottom;
+  }
+  td{
+    padding:.85rem 1.25rem .85rem 0;border-bottom:1px solid var(--rule);
+    vertical-align:top;line-height:1.6;
+  }
+  th:last-child,td:last-child{padding-right:0}
+  td.m{font-family:var(--mono);font-size:.8125rem;white-space:nowrap}
+  td.q{color:var(--ink-2)}
+  .lockmark{font-family:var(--mono);font-size:.75rem;white-space:nowrap}
+  .lockmark.o{color:var(--signal)}
+
+  /* ---------- callout ---------- */
+  .note{
+    border-left:2px solid var(--signal);padding:.25rem 0 .25rem 1.25rem;
+    margin:2rem 0 0;max-width:36rem;
+  }
+  .note p{font-size:.9375rem;color:var(--ink-2);margin-bottom:.6rem;font-weight:300}
+  .note p:last-child{margin-bottom:0}
+  .note b{color:var(--ink);font-weight:500}
+
+  /* ---------- modes ---------- */
+  .modes{display:grid;gap:0;margin-top:.5rem}
+  .mode{padding:1.75rem 0;border-top:1px solid var(--rule)}
+  .mode:last-child{border-bottom:1px solid var(--rule)}
+  .mode-h{display:flex;gap:.9rem;align-items:baseline;flex-wrap:wrap;margin-bottom:.75rem}
+  .mode-h .nm{font-size:1.0625rem;font-weight:600;letter-spacing:-.01em}
+  .mode-h .badge{
+    font-family:var(--mono);font-size:.6875rem;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--ink-2);
+    border:1px solid var(--rule);padding:.1rem .5rem;
+  }
+  .mode p{font-size:.9375rem;font-weight:300;color:var(--ink-2)}
+  .mode p b{font-weight:500;color:var(--ink)}
+  .steps{
+    list-style:none;margin:1rem 0 0;padding:0;
+    display:flex;flex-wrap:wrap;gap:.4rem;
+  }
+  .steps li{
+    font-family:var(--mono);font-size:.75rem;color:var(--ink-2);
+    border:1px solid var(--rule);padding:.28rem .6rem;white-space:nowrap;
+  }
+  .steps li.stop{border-color:var(--signal);color:var(--signal)}
+
+  /* ---------- colophon ---------- */
+  .colophon{
+    padding:3rem 0 0;font-family:var(--mono);font-size:.75rem;
+    line-height:1.9;color:var(--ink-3);
+  }
+
+  a{color:var(--ink);text-underline-offset:.2em}
+  :focus-visible{outline:2px solid var(--signal);outline-offset:3px}
+
+  @media (max-width:44rem){
+    .wrap{padding:0 1.25rem 4rem}
+    .mast{padding-top:3rem}
+    .sec{grid-template-columns:1fr;row-gap:1.25rem;padding:2.5rem 0}
+    .rail{flex-direction:row;align-items:baseline;gap:.75rem;padding-top:0}
+    .rail .num{font-size:1.25rem}
+    .layer,.step{grid-template-columns:1fr;gap:.9rem}
+    .defs{grid-template-columns:1fr}
+    .def+.def{padding:1.5rem 1.75rem 1.5rem 0;border-left:0;border-top:1px solid var(--rule)}
+    .fact{border-right:0;border-bottom:1px solid var(--rule)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="mast">
+    <div class="eyebrow">
+      <span>Baseline Skill</span><span class="sep">/</span>
+      <span>프론트엔드 프로젝트 기준</span><span class="sep">/</span>
+      <span>v2</span>
+    </div>
+    <h1>잠긴 기준,<br><span class="open">열린 디테일</span></h1>
+    <p class="deck">
+      소프트웨어 엔지니어링에서 기준을 세우고, 그 기준 위에 프로젝트 Context를 쓰고,
+      그 Context를 보고 코드를 씁니다.
+      <b>코드는 Context 없이는 못 쓰고, Context는 기준 없이는 못 만듭니다.</b>
+    </p>
+    <dl class="facts">
+      <div class="fact"><dt>층</dt><dd>3</dd></div>
+      <div class="fact"><dt>답할 주제</dt><dd>8</dd></div>
+      <div class="fact"><dt>넘지 말 선</dt><dd>21</dd></div>
+      <div class="fact"><dt>정할 기술</dt><dd>26</dd></div>
+      <div class="fact"><dt>하는 일</dt><dd>2</dd></div>
+    </dl>
+  </header>
+
+  <!-- 01 ------------------------------------------------------------- -->
+  <section class="sec">
+    <div class="rail"><span class="num">01</span><span class="tag">원칙</span></div>
+    <div class="col">
+      <p class="stmt">Baseline은 <b>잠겨</b> 있고,<br>Context는 <b>열려</b> 있습니다.</p>
+      <p class="body">
+        <b>기준은 소프트웨어 엔지니어링에서 옵니다.</b> 어떤 프로젝트를 만들든 결국 같은 것들이
+        문제가 됩니다. 밖에서 들어온 값을 어디서 검사할지, 어떤 값을 누가 갖는지,
+        시작한 일을 누가 끝낼지, 실패를 어떻게 드러낼지. Baseline은 그런 질문을 모아 둔 것입니다.
+        회사 취향으로 고른 게 아니라서, 프로젝트가 달라져도 질문은 그대로입니다.
+      </p>
+      <p class="body">
+        <b>Baseline은 그 기준을 회사 것으로 적어 둔 문서입니다.</b> 프로젝트가 고치지 않습니다.
+        무엇을 정해야 하는지 목록이 들어 있고, 아직 안 정한 자리는 비운 채로 둡니다.
+      </p>
+      <p class="body">
+        <b>Context는 그 기준 위에 이 프로젝트의 디테일을 쓰는 곳입니다.</b>
+        기준이 던진 질문에 우리 사정으로 답합니다. 고른 기술, 버전, 실행되는 명령어,
+        기준과 다르게 간 이유가 전부 여기 쌓입니다. 프로젝트가 마음대로 채우고 늘립니다.
+      </p>
+      <p class="body">
+        <b>코드는 Context를 보고 씁니다.</b> Baseline은 열어보지 않습니다.
+        필요한 기준은 이미 Context 안에 옮겨 적혀 있기 때문입니다.
+      </p>
+    </div>
+  </section>
+
+  <!-- 02 ------------------------------------------------------------- -->
+  <section class="sec">
+    <div class="rail"><span class="num">02</span><span class="tag">닫힘과 열림</span></div>
+    <div class="col">
+      <h2>닫혀 있다, 열려 있다</h2>
+      <p class="sum">
+        이 문서에서 두 낱말은 뜻이 정해져 있습니다. <strong>바꿀 수 있느냐</strong>의 문제입니다.
+      </p>
+
+      <div class="defs">
+        <div class="def shut">
+          <span class="mk">닫힘 — Baseline</span>
+          <p class="ttl">프로젝트가 못 바꿉니다</p>
+          <ul>
+            <li>목록이 <b>고정</b>입니다. 늘리거나 줄이지 못합니다.</li>
+            <li>답을 안 해도 되는 질문은 없습니다.</li>
+            <li>바꾸려면 <b>회사가 결정</b>해야 합니다. 프로젝트 안에서 처리할 수 없습니다.</li>
+            <li>그래서 모든 프로젝트가 <b>같은 질문</b>에 답합니다.</li>
+          </ul>
+        </div>
+        <div class="def free">
+          <span class="mk">열림 — Context</span>
+          <p class="ttl">프로젝트가 마음대로 합니다</p>
+          <ul>
+            <li>얼마든지 <b>늘리고 고칩니다.</b></li>
+            <li>문서를 더 만들어도 되고, 표에 줄을 더해도 됩니다.</li>
+            <li>이 프로젝트에만 있는 사정을 <b>따로 적어도</b> 됩니다.</li>
+            <li>그래서 프로젝트마다 <b>답이 다릅니다.</b></li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="body">
+        <b>닫혀 있어서 비교할 수 있고, 열려 있어서 각자 살아남습니다.</b>
+        두 프로젝트가 같은 질문에 답했으니 나란히 놓고 볼 수 있습니다. 답은 서로 달라도 됩니다.
+      </p>
+      <p class="body">
+        전부 닫아 버리면 모든 프로젝트가 똑같아야 합니다. 전부 열어 버리면 아무것도 기준이 되지 못합니다.
+        <b>둘 다 있어야 합니다.</b>
+      </p>
+
+      <div class="note">
+        <p><b>닫힘은 완성과 다릅니다.</b> 질문 목록이 닫혀 있다고 해서 답이 다 차 있는 건 아닙니다.
+        회사가 아직 답을 안 정한 질문도 목록에는 그대로 있습니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 ------------------------------------------------------------- -->
+  <section class="sec">
+    <div class="rail"><span class="num">03</span><span class="tag">핵심 구조</span></div>
+    <div class="col">
+      <h2>세 층, 두 방향</h2>
+      <p class="sum">
+        <strong>만들 때</strong>는 아래에서 위로 갑니다.
+        <strong>의존</strong>은 위에서 아래로 갑니다. 둘 다 바로 옆 층까지만입니다.
+      </p>
+
+      <figure>
+        <div class="figbox">
+          <svg viewBox="0 0 760 500" role="img"
+               aria-label="세 층 구조도. 아래부터 BASELINE(잠김), CONTEXT(열림), CODE(결과물). 왼쪽 화살표는 위로 향하며 Baseline으로 Context를 만들고 Context로 코드를 쓴다는 것을 나타낸다. 오른쪽 화살표는 아래로 향하며 코드는 Context가 없으면 못 쓰고 Context는 Baseline이 없으면 못 만든다는 의존 관계를 나타낸다. 모든 화살표는 바로 옆 층까지만 이어진다.">
+            <defs>
+              <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5"
+                      markerWidth="6.5" markerHeight="6.5" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+              </marker>
+            </defs>
+
+            <text x="140" y="18" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+                  font-size="11" letter-spacing="1.2" fill="currentColor" opacity=".72">만든다 ↑</text>
+            <text x="600" y="18" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+                  font-size="11" letter-spacing="1.2" fill="currentColor" opacity=".72">↓ 의존한다</text>
+
+            <!-- L3 CODE -->
+            <rect x="170" y="34" width="400" height="88" fill="none"
+                  stroke="currentColor" stroke-width="1" opacity=".55"/>
+            <text x="190" y="64" font-family="IBM Plex Mono, monospace" font-size="12"
+                  fill="currentColor" opacity=".72">L3</text>
+            <text x="232" y="66" font-family="Archivo, sans-serif" font-size="23"
+                  font-weight="800" letter-spacing="-.3" fill="currentColor">CODE</text>
+            <text x="190" y="95" font-family="IBM Plex Sans KR, sans-serif" font-size="13"
+                  fill="currentColor" opacity=".7">Context를 보고 쓴 실제 코드</text>
+            <text x="550" y="65" text-anchor="end" font-family="IBM Plex Mono, monospace"
+                  font-size="11" fill="currentColor" opacity=".72">결과물</text>
+
+            <!-- L2 CONTEXT -->
+            <rect x="170" y="190" width="400" height="88" fill="none" stroke="currentColor"
+                  stroke-width="1.5" stroke-dasharray="5 4"/>
+            <text x="190" y="220" font-family="IBM Plex Mono, monospace" font-size="12"
+                  fill="currentColor" opacity=".72">L2</text>
+            <text x="232" y="222" font-family="Archivo, sans-serif" font-size="23"
+                  font-weight="800" letter-spacing="-.3" fill="currentColor">CONTEXT</text>
+            <text x="190" y="251" font-family="IBM Plex Sans KR, sans-serif" font-size="13"
+                  fill="currentColor" opacity=".7">이 프로젝트가 실제로 고른 것</text>
+            <rect class="sg-s" x="522" y="212" width="9" height="9" fill="none"
+                  stroke-width="1.5"/>
+            <text class="sg" x="538" y="221" font-family="IBM Plex Mono, monospace"
+                  font-size="11">열림</text>
+
+            <!-- L1 BASELINE -->
+            <rect x="170" y="346" width="400" height="128" fill="none"
+                  stroke="currentColor" stroke-width="2.5"/>
+            <text x="190" y="376" font-family="IBM Plex Mono, monospace" font-size="12"
+                  fill="currentColor" opacity=".72">L1</text>
+            <text x="232" y="378" font-family="Archivo, sans-serif" font-size="23"
+                  font-weight="800" letter-spacing="-.3" fill="currentColor">BASELINE</text>
+            <text x="190" y="407" font-family="IBM Plex Sans KR, sans-serif" font-size="13"
+                  fill="currentColor" opacity=".7">엔지니어링에서 온 기준</text>
+            <line x1="190" y1="424" x2="550" y2="424" stroke="currentColor"
+                  stroke-width="1" opacity=".3"/>
+            <text x="190" y="450" font-family="IBM Plex Mono, monospace" font-size="11"
+                  fill="currentColor" opacity=".75">주제 8 · 넘지 말 선 21 · 기술 26줄 · 상태 어휘</text>
+            <rect x="522" y="368" width="9" height="9" fill="currentColor"/>
+            <text x="538" y="377" font-family="IBM Plex Mono, monospace" font-size="11"
+                  fill="currentColor">잠김</text>
+
+            <!-- make (left, up) -->
+            <line x1="140" y1="340" x2="140" y2="284" stroke="currentColor"
+                  stroke-width="1.5" marker-end="url(#ah)"/>
+            <text x="126" y="316" text-anchor="end" font-family="IBM Plex Sans KR, sans-serif"
+                  font-size="12" fill="currentColor">Context를 만듦</text>
+            <line x1="140" y1="184" x2="140" y2="128" stroke="currentColor"
+                  stroke-width="1.5" marker-end="url(#ah)"/>
+            <text x="126" y="160" text-anchor="end" font-family="IBM Plex Sans KR, sans-serif"
+                  font-size="12" fill="currentColor">코드를 씀</text>
+
+            <!-- depend (right, down) -->
+            <line x1="600" y1="128" x2="600" y2="184" stroke="currentColor"
+                  stroke-width="1.5" marker-end="url(#ah)"/>
+            <text x="614" y="160" font-family="IBM Plex Sans KR, sans-serif"
+                  font-size="12" fill="currentColor">없으면 못 씀</text>
+            <line x1="600" y1="284" x2="600" y2="340" stroke="currentColor"
+                  stroke-width="1.5" marker-end="url(#ah)"/>
+            <text x="614" y="316" font-family="IBM Plex Sans KR, sans-serif"
+                  font-size="12" fill="currentColor">없으면 못 만듦</text>
+          </svg>
+        </div>
+        <figcaption>
+          <b>테두리로 구분합니다.</b> 굵은 실선은 잠긴 층, 파선은 열린 층,
+          얇은 실선은 결과물입니다. 화살표가 바로 옆 층까지만 가는 것이 핵심입니다 —
+          CODE에서 BASELINE으로 바로 가는 선은 없습니다.
+        </figcaption>
+      </figure>
+
+      <div class="layers">
+        <div class="layer locked">
+          <div><span class="name">BASELINE</span><span class="state">잠김</span></div>
+          <div>
+            <p class="lab">여기 있는 것</p>
+            <ul>
+              <li>Context가 답해야 할 질문</li>
+              <li>넘지 말아야 할 선</li>
+              <li>회사 기본값과 고를 수 있는 후보</li>
+              <li>최소 지원 버전</li>
+              <li>같이 못 쓰는 조합</li>
+            </ul>
+          </div>
+          <div>
+            <p class="lab">여기 없는 것</p>
+            <ul class="no">
+              <li>프로젝트가 실제로 고른 값</li>
+              <li>실제 버전과 업데이트 방식</li>
+              <li>실행 명령어와 파일 경로</li>
+              <li>Context 문서를 어떻게 나눌지</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="layer open">
+          <div><span class="name">CONTEXT</span><span class="state">열림</span></div>
+          <div>
+            <p class="lab">여기 있는 것</p>
+            <ul>
+              <li>고른 기술과 버전, 고른 이유</li>
+              <li>설치 · 개발 · 빌드 · 검사 명령어</li>
+              <li>어느 폴더가 무엇을 책임지는지</li>
+              <li>화면이 어떤 모습을 보여줘야 하는지</li>
+              <li>기준과 다르게 간 부분과 그 이유</li>
+            </ul>
+          </div>
+          <div>
+            <p class="lab">여기 없는 것</p>
+            <ul class="no">
+              <li>회사 기준 자체의 변경</li>
+              <li>Baseline 문장을 베낀 것</li>
+              <li>실제 비밀번호나 키 값</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="layer">
+          <div><span class="name">CODE</span><span class="state">결과물</span></div>
+          <div>
+            <p class="lab">하는 일</p>
+            <ul>
+              <li>Context를 먼저 읽고 그에 맞게 씀</li>
+              <li>Context가 한 말이 맞다는 증거가 됨 — 설정 파일, lockfile, 빌드 결과</li>
+              <li>규칙이나 명령어가 바뀌면 Context에 적어 넣음</li>
+            </ul>
+          </div>
+          <div>
+            <p class="lab">안 하는 일</p>
+            <ul class="no">
+              <li>Baseline 직접 열어보기</li>
+              <li>Context 없이 먼저 시작하기</li>
+              <li>Context와 다른데 그냥 넘어가기</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 ------------------------------------------------------------- -->
+  <section class="sec">
+    <div class="rail"><span class="num">04</span><span class="tag">예시</span></div>
+    <div class="col">
+      <h2>하나만 따라가 보면</h2>
+      <p class="sum">
+        「상태 관리 라이브러리를 무엇으로 할까」 하나가 세 층을 어떻게 지나가는지 보겠습니다.
+      </p>
+
+      <div class="walk">
+        <div class="step">
+          <div class="who">BASELINE<span>잠김</span></div>
+          <div>
+            <p class="quote">FTS-13 · client state<br>Zustand, Jotai, React 기본 상태와 Context 중 프로젝트별 선택</p>
+            <p class="meta">
+              회사가 주는 것은 <b>질문</b>과 <b>답 후보 셋</b>입니다.
+              그중 무엇을 고를지는 주지 않습니다. 이 질문을 지울 수도 없습니다.
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="who">CONTEXT<span>열림</span></div>
+          <div>
+            <p class="says">
+              「이 프로젝트는 Zustand 5.0.3을 씁니다. 서버에서 받아온 데이터는 TanStack Query가 갖고 있어서,
+              여러 화면이 같이 쓸 상태가 얼마 없기 때문입니다. 같이 쓰는 상태는
+              <code>src/stores/</code>에 두고, 나머지는 화면이 각자 갖습니다.」
+            </p>
+            <p class="meta">
+              셋 중 하나로 <b>답합니다.</b> <b>왜 골랐는지</b>와 <b>어디에 두는지</b>를 같이 적습니다.
+              버전도 여기서 정합니다. Baseline에는 버전이 없습니다.
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="who">CODE<span>결과물</span></div>
+          <div>
+            <p class="quote">src/stores/session.ts</p>
+            <p class="meta">
+              Context가 말한 그대로 구현됩니다. 같이 쓰는 상태를 새로 만들면
+              <b>Context의 상태 표에도 한 줄이 늘어납니다.</b>
+              Context에 없는 상태를 코드에만 슬쩍 만들어 두지 않습니다 —
+              그러면 아무도 모르는 규칙이 하나 생깁니다.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="note">
+        <p><b>Zustand를 Jotai로 바꾸고 싶다면?</b> Baseline은 건드리지 않습니다.
+        이미 셋 다 허용돼 있으니까요. Context의 선택과 이유를 바꾸고, 코드를 따라 고칩니다.</p>
+        <p><b>Redux를 쓰고 싶다면?</b> 그건 Baseline에 없는 후보입니다.
+        코드부터 쓰는 게 아니라, 회사 기준을 바꿀지 먼저 결정해야 합니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 ------------------------------------------------------------- -->
+  <section class="sec">
+    <div class="rail"><span class="num">05</span><span class="tag">라우팅</span></div>
+    <div class="col">
+      <h2>작업이 Context를 찾아가는 길</h2>
+      <p class="sum">
+        Context를 처음부터 끝까지 읽지 않습니다. 진입점에서 <strong>이번 작업에 걸리는 조건</strong>을
+        찾고, 걸린 문서만 읽습니다.
+      </p>
+
+      <figure>
+        <div class="figbox">
+          <svg viewBox="0 0 780 340" role="img"
+               aria-label="라우팅 흐름도. 목록 화면에 필터를 추가하라는 작업 요청이 진입점 AGENTS.md와 CLAUDE.md의 인덱스로 들어간다. 인덱스에서 조건이 갈라져 모든 작업은 software.md로, 화면 상태와 상호작용 변경은 ui-ux.md로, 외부 데이터와 API 변경은 system.md로 이어진다. 권한과 외부 입력 변경, 되돌리기 어려운 선택 조건은 이번 작업에 걸리지 않아 흐리게 표시된다. 걸린 조건은 하나에서 멈추지 않고 모두 따른다.">
+            <defs>
+              <marker id="ah4" viewBox="0 0 10 10" refX="9" refY="5"
+                      markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+              </marker>
+            </defs>
+
+            <!-- 작업 요청 -->
+            <rect x="20" y="142" width="150" height="80" fill="none"
+                  stroke="currentColor" stroke-width="1.5"/>
+            <text x="34" y="167" font-family="IBM Plex Mono, monospace" font-size="10.5"
+                  fill="currentColor" opacity=".72">작업 요청</text>
+            <text x="34" y="191" font-family="IBM Plex Sans KR, sans-serif" font-size="13"
+                  fill="currentColor">목록 화면에</text>
+            <text x="34" y="209" font-family="IBM Plex Sans KR, sans-serif" font-size="13"
+                  fill="currentColor">필터 추가</text>
+
+            <line x1="174" y1="182" x2="204" y2="182" stroke="currentColor"
+                  stroke-width="1.5" marker-end="url(#ah4)"/>
+
+            <!-- 진입점 -->
+            <rect x="210" y="142" width="140" height="80" fill="none"
+                  stroke="currentColor" stroke-width="2.5"/>
+            <text x="224" y="167" font-family="IBM Plex Mono, monospace" font-size="10.5"
+                  fill="currentColor" opacity=".72">진입점 인덱스</text>
+            <text x="224" y="191" font-family="IBM Plex Mono, monospace" font-size="12"
+                  fill="currentColor">AGENTS.md</text>
+            <text x="224" y="209" font-family="IBM Plex Mono, monospace" font-size="12"
+                  fill="currentColor">CLAUDE.md</text>
+
+            <!-- 걸린 조건 3개 -->
+            <path d="M350,182 C374,182 374,44 388,44" fill="none" stroke="currentColor"
+                  stroke-width="1.5" marker-end="url(#ah4)"/>
+            <text x="398" y="48" font-family="IBM Plex Sans KR, sans-serif" font-size="12"
+                  fill="currentColor">모든 작업</text>
+            <line x1="566" y1="44" x2="588" y2="44" stroke="currentColor"
+                  stroke-width="1.5" marker-end="url(#ah4)"/>
+            <rect x="596" y="28" width="158" height="32" fill="none"
+                  stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 4"/>
+            <text x="675" y="48" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+                  font-size="12" fill="currentColor">software.md</text>
+
+            <path d="M350,182 C374,182 374,104 388,104" fill="none" stroke="currentColor"
+                  stroke-width="1.5" marker-end="url(#ah4)"/>
+            <text x="398" y="108" font-family="IBM Plex Sans KR, sans-serif" font-size="12"
+                  fill="currentColor">화면 상태·상호작용 변경</text>
+            <line x1="566" y1="104" x2="588" y2="104" stroke="currentColor"
+                  stroke-width="1.5" marker-end="url(#ah4)"/>
+            <rect x="596" y="88" width="158" height="32" fill="none"
+                  stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 4"/>
+            <text x="675" y="108" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+                  font-size="12" fill="currentColor">ui-ux.md</text>
+
+            <path d="M350,182 C374,182 374,164 388,164" fill="none" stroke="currentColor"
+                  stroke-width="1.5" marker-end="url(#ah4)"/>
+            <text x="398" y="168" font-family="IBM Plex Sans KR, sans-serif" font-size="12"
+                  fill="currentColor">외부 데이터·API 변경</text>
+            <line x1="566" y1="164" x2="588" y2="164" stroke="currentColor"
+                  stroke-width="1.5" marker-end="url(#ah4)"/>
+            <rect x="596" y="148" width="158" height="32" fill="none"
+                  stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 4"/>
+            <text x="675" y="168" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+                  font-size="12" fill="currentColor">system.md</text>
+
+            <!-- 안 걸린 조건 2개 -->
+            <g opacity=".34">
+              <path d="M350,182 C374,182 374,224 388,224" fill="none" stroke="currentColor"
+                    stroke-width="1.5" stroke-dasharray="3 4"/>
+              <text x="398" y="228" font-family="IBM Plex Sans KR, sans-serif" font-size="12"
+                    fill="currentColor">권한·외부 입력 변경</text>
+              <line x1="566" y1="224" x2="588" y2="224" stroke="currentColor"
+                    stroke-width="1.5" stroke-dasharray="3 4"/>
+              <rect x="596" y="208" width="158" height="32" fill="none"
+                    stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 4"/>
+              <text x="675" y="228" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+                    font-size="12" fill="currentColor">security.md</text>
+
+              <path d="M350,182 C374,182 374,284 388,284" fill="none" stroke="currentColor"
+                    stroke-width="1.5" stroke-dasharray="3 4"/>
+              <text x="398" y="288" font-family="IBM Plex Sans KR, sans-serif" font-size="12"
+                    fill="currentColor">되돌리기 어려운 선택</text>
+              <line x1="566" y1="284" x2="588" y2="284" stroke="currentColor"
+                    stroke-width="1.5" stroke-dasharray="3 4"/>
+              <rect x="596" y="268" width="158" height="32" fill="none"
+                    stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 4"/>
+              <text x="675" y="288" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+                    font-size="12" fill="currentColor">decision.md</text>
+            </g>
+
+            <text x="398" y="322" font-family="IBM Plex Sans KR, sans-serif" font-size="11"
+                  fill="currentColor" opacity=".62">흐린 줄은 이번 작업에 걸리지 않은 조건입니다</text>
+          </svg>
+        </div>
+        <figcaption>
+          <b>걸린 조건은 모두 따릅니다.</b> 처음 하나가 맞았다고 멈추지 않습니다.
+          필터 하나를 붙여도 화면 상태와 데이터 가져오는 방식이 같이 걸리면 둘 다 읽습니다.
+          이 작업이 건드리는 다른 화면이나 모듈이 있으면 그쪽 조건도 따라갑니다.
+        </figcaption>
+      </figure>
+
+      <h3>에이전트가 하는 일이 바로 이것입니다</h3>
+      <p class="body">
+        위 그림은 문서를 정리하는 절차가 아닙니다. <b>코딩 에이전트가 실제로 하는 일 그대로입니다.</b>
+        사람이 「목록 화면에 필터 추가해줘」라고 하면, 에이전트는 코드를 열기 전에 진입점을 읽고,
+        조건에 걸리는 문서를 찾아 읽고, 거기 적힌 규칙 안에서 코드를 씁니다.
+      </p>
+      <p class="body">
+        그래서 <b>인덱스는 문서 목록이 아니라 읽는 순서 그 자체입니다.</b>
+        사람한테도 같습니다. 새로 온 사람이 「이 화면 고치려면 뭘 봐야 하나요」라고 물으면
+        답이 바로 이 인덱스입니다.
+      </p>
+      <p class="body">
+        반대로 여기가 끊기면 Context가 있어도 아무 일도 하지 않습니다.
+        에이전트는 그 규칙을 <b>모르는 채로</b> 코드를 씁니다. 문서가 없어서가 아니라
+        <b>닿지 않아서</b> 생기는 문제입니다.
+      </p>
+
+      <h3>길이 끊기는 네 가지</h3>
+      <ul class="rules deny">
+        <li>
+          <span class="k">✕</span>
+          <p class="t"><b>조건이 아예 없음</b>
+          <span>그 작업을 걸어 줄 줄이 인덱스에 없습니다. 문서는 있는데 아무도 찾아가지 못합니다.</span></p>
+        </li>
+        <li>
+          <span class="k">✕</span>
+          <p class="t"><b>가리키는 문서가 없음</b>
+          <span>조건은 있는데 그 끝에 파일이 없습니다. 이름이 바뀌었거나 지워진 경우입니다.</span></p>
+        </li>
+        <li>
+          <span class="k">✕</span>
+          <p class="t"><b>엉뚱한 문서를 가리킴</b>
+          <span>파일은 있는데 그 질문의 답이 거기 없습니다. 도착은 했지만 얻는 게 없습니다.</span></p>
+        </li>
+        <li>
+          <span class="k">✕</span>
+          <p class="t"><b>링크만 있고 읽히지 않음</b>
+          <span>본문에 링크만 걸려 있으면 에이전트가 자동으로 열지 않습니다.
+          <b>인덱스에 조건과 경로가 직접 적혀 있어야</b> 읽습니다. 링크는 발견을 도울 뿐 길이 아닙니다.</span></p>
+        </li>
+      </ul>
+
+      <div class="note">
+        <p><b>그래서 점검할 때 「문서가 있나」와 「길이 닿나」를 따로 봅니다.</b>
+        문서가 멀쩡히 있어도 닿지 않으면 없는 것과 같습니다. 반대로 길은 멀쩡한데 내용이
+        모자란 것은 또 다른 문제입니다. 두 가지를 섞어서 보면 무엇을 고쳐야 할지 알 수 없습니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 ------------------------------------------------------------- -->
+  <section class="sec">
+    <div class="rail"><span class="num">06</span><span class="tag">질문과 답</span></div>
+    <div class="col">
+      <h2>회사는 묻고, 프로젝트가 답합니다</h2>
+      <p class="sum">
+        Baseline은 <strong>질문 목록</strong>입니다. 프로젝트가 질문을 지울 수는 없습니다.
+        <strong>답</strong>은 프로젝트가 씁니다.
+      </p>
+      <p class="body">
+        다만 회사가 답까지 미리 준 질문도 있습니다. 질문마다 회사가 어디까지 주는지가 다릅니다.
+      </p>
+
+      <div class="tw">
+        <table>
+          <thead>
+            <tr><th>번호</th><th>회사가 묻는 것</th><th>회사가 주는 것</th><th>어디까지 줬나</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="m">FTS-08</td>
+              <td>패키지 매니저</td>
+              <td class="q">pnpm (<code>pnpm-lock.yaml</code>)</td>
+              <td class="lockmark">■ 답까지 줌</td>
+            </tr>
+            <tr>
+              <td class="m">FTS-10</td>
+              <td>스타일 작성 방식</td>
+              <td class="q">Tailwind CSS, CSS Modules, Vanilla CSS</td>
+              <td class="lockmark o">□ 답 후보만 줌</td>
+            </tr>
+            <tr>
+              <td class="m">FTS-24</td>
+              <td>에러 모니터링</td>
+              <td class="q">프로젝트가 알아서, 안 써도 됨</td>
+              <td class="lockmark o">□ 질문만 줌</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="body">
+        <b>FTS-24처럼 질문만 준 것도 답은 해야 합니다.</b>
+        "안 씁니다"도 답입니다. 그리고 답했다는 사실이 Context에 남아야 합니다.
+        그냥 넘어간 것과 안 쓰기로 정한 것은 다르니까요.
+      </p>
+
+      <h3>누가 무엇을 적나</h3>
+      <div class="tw">
+        <table>
+          <thead>
+            <tr><th></th><th>회사가 주는 것</th><th>프로젝트가 적는 것</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>기술</td><td class="q">기본값 · 고를 수 있는 후보 · 금지</td><td class="q">실제로 고른 것과 이유</td></tr>
+            <tr><td>버전</td><td class="q">최소 지원 버전</td><td class="q">실제 버전 · 업데이트 방식</td></tr>
+            <tr><td>질문 수</td><td class="q">주제 8 · 넘지 말 선 21 · 기술 26줄</td><td class="q">답을 어느 문서에 몇 줄로 적을지는 마음대로</td></tr>
+            <tr><td>명령어</td><td class="q">없음</td><td class="q">설치 · 개발 · 빌드 · 검사 전부</td></tr>
+            <tr><td>숫자 기준</td><td class="q">회사가 딱 집어 정한 것만</td><td class="q">나머지 전부, 이유와 함께</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 07 ------------------------------------------------------------- -->
+  <section class="sec">
+    <div class="rail"><span class="num">07</span><span class="tag">L1 구성</span></div>
+    <div class="col">
+      <h2>BASELINE.md는 다섯 조각입니다</h2>
+      <p class="sum">
+        목차 한 장과 파일 다섯 개를 다 합쳐야 기준 하나입니다. 목차만 보고 짐작하지 않습니다.
+        다섯 조각 모두 소프트웨어 엔지니어링에서 나온 것이지, 회사 취향이 아닙니다.
+      </p>
+      <ul class="rules">
+        <li>
+          <span class="k">1</span>
+          <p class="t"><b>주제 — 8개</b>
+          <span>Context가 꼭 답해야 하는 질문들. 제품, 기술과 명령어, 폴더 구조와 화면 주소,
+          상태를 누가 갖는지, 화면과 스타일, 데이터 가져오기, 검사, 결정 기록.</span></p>
+        </li>
+        <li>
+          <span class="k">2</span>
+          <p class="t"><b>기술 스택 — 26줄</b>
+          <span>언어부터 지도까지, 정해야 할 것 26개. 줄마다 회사 기본값과 고를 수 있는 후보가 있고,
+          아직 안 정한 줄은 <code>미결정</code>이라고 둡니다.</span></p>
+        </li>
+        <li>
+          <span class="k">3</span>
+          <p class="t"><b>넘지 말아야 할 선 — 21개</b>
+          <span>예를 들어 "비밀값을 브라우저에 두지 않는다", "시작한 요청과 타이머는 결국 정리한다",
+          "실패를 성공처럼 보이게 하지 않는다". 짧은 한 줄짜리 규칙들입니다.</span></p>
+        </li>
+        <li>
+          <span class="k">4</span>
+          <p class="t"><b>상태를 적는 말</b>
+          <span><code>구현됨</code> <code>문서-코드 불일치</code> <code>확인 못 함</code>.
+          점수가 아닙니다. 모르는 건 모른다고 적지, 몇 점이라고 바꾸지 않습니다.</span></p>
+        </li>
+        <li>
+          <span class="k">5</span>
+          <p class="t"><b>선에 대한 해설</b>
+          <span>21개를 읽기 편한 11개 주의사항으로 풀어 쓴 것. 다만 의견을 적을 때는
+          <code>ST-3</code>처럼 원래 번호를 씁니다. 말이 흔들리지 않게요.</span></p>
+        </li>
+      </ul>
+      <div class="note">
+        <p><b>선은 "어떻게 만들어라"가 아닙니다.</b> Context가 무엇을 확인할 수 있게 적어야 하는지만
+        말합니다. 그래서 선 문장을 그대로 베껴 놓고 "우리는 이렇게 합니다"라고
+        할 수 없습니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 08 ------------------------------------------------------------- -->
+  <section class="sec">
+    <div class="rail"><span class="num">08</span><span class="tag">의존 방향</span></div>
+    <div class="col">
+      <h2>넘지 말아야 할 네 선</h2>
+      <p class="sum">
+        층이 무너질 때는 늘 이 넷 중 하나입니다. 아래가 위를 알거나, 위가 아래를 베끼거나,
+        한 층을 건너뛰거나, 빈 자리를 슬쩍 메우거나.
+      </p>
+
+      <figure>
+        <div class="figbox">
+          <svg viewBox="0 0 620 250" role="img"
+               aria-label="가로 배치 구조도. 왼쪽부터 BASELINE, CONTEXT, CODE. 코드는 Context에 의존하고 Context는 Baseline에 의존한다. 위쪽 화살표는 코드에서 Context로 돌아가는 갱신 되먹임이며 한 층만 이동한다. 아래쪽 화살표는 코드에서 Baseline으로 바로 가는 경로이며 가위표로 금지 표시가 되어 있다.">
+            <defs>
+              <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5"
+                      markerWidth="6.5" markerHeight="6.5" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+              </marker>
+              <marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5"
+                      markerWidth="6.5" markerHeight="6.5" orient="auto">
+                <path class="sg" d="M0,0 L10,5 L0,10 z"/>
+              </marker>
+            </defs>
+
+            <rect x="20" y="68" width="150" height="68" fill="none"
+                  stroke="currentColor" stroke-width="2.5"/>
+            <text x="95" y="100" text-anchor="middle" font-family="Archivo, sans-serif"
+                  font-size="15" font-weight="800" fill="currentColor">BASELINE</text>
+            <text x="95" y="120" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+                  font-size="10" fill="currentColor" opacity=".72">잠김</text>
+
+            <rect x="220" y="68" width="150" height="68" fill="none"
+                  stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 4"/>
+            <text x="295" y="100" text-anchor="middle" font-family="Archivo, sans-serif"
+                  font-size="15" font-weight="800" fill="currentColor">CONTEXT</text>
+            <text class="sg" x="295" y="120" text-anchor="middle"
+                  font-family="IBM Plex Mono, monospace" font-size="10">열림</text>
+
+            <rect x="420" y="68" width="150" height="68" fill="none"
+                  stroke="currentColor" stroke-width="1" opacity=".55"/>
+            <text x="495" y="100" text-anchor="middle" font-family="Archivo, sans-serif"
+                  font-size="15" font-weight="800" fill="currentColor">CODE</text>
+            <text x="495" y="120" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+                  font-size="10" fill="currentColor" opacity=".72">결과물</text>
+
+            <line x1="418" y1="102" x2="376" y2="102" stroke="currentColor"
+                  stroke-width="1.5" marker-end="url(#ah2)"/>
+            <text x="397" y="92" text-anchor="middle" font-family="IBM Plex Sans KR, sans-serif"
+                  font-size="11" fill="currentColor">의존</text>
+            <line x1="218" y1="102" x2="176" y2="102" stroke="currentColor"
+                  stroke-width="1.5" marker-end="url(#ah2)"/>
+            <text x="197" y="92" text-anchor="middle" font-family="IBM Plex Sans KR, sans-serif"
+                  font-size="11" fill="currentColor">의존</text>
+
+            <path d="M495,64 L495,30 L299,30 L299,62" fill="none" stroke="currentColor"
+                  stroke-width="1.5" marker-end="url(#ah2)"/>
+            <text x="397" y="22" text-anchor="middle" font-family="IBM Plex Sans KR, sans-serif"
+                  font-size="11" fill="currentColor">바뀌면 여기까지만 적는다</text>
+
+            <path class="sg-s" d="M495,140 L495,196 L95,196 L95,142" fill="none"
+                  stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#ah3)"/>
+            <line class="sg-s" x1="286" y1="187" x2="304" y2="205" stroke-width="2"/>
+            <line class="sg-s" x1="304" y1="187" x2="286" y2="205" stroke-width="2"/>
+            <text class="sg" x="295" y="230" text-anchor="middle"
+                  font-family="IBM Plex Sans KR, sans-serif" font-size="11">코드는 Baseline을 직접 보지 않는다</text>
+          </svg>
+        </div>
+        <figcaption>
+          <b>되돌아가는 것도 한 층까지입니다.</b> 코드가 규칙이나 명령어를 바꾸면 Context를 고치지만,
+          거기서 멈춥니다. 회사 기준을 바꾸는 건 따로 결정할 일입니다.
+        </figcaption>
+      </figure>
+
+      <ul class="rules deny">
+        <li>
+          <span class="k">✕</span>
+          <p class="t"><b>Baseline은 Context 파일 이름을 몰라야 합니다</b>
+          <span>기준이 <code>system.md</code>를 딱 집는 순간, 회사 기준이 프로젝트 파일 이름에 묶여 버립니다.
+          "프로젝트가 따로 적는다"까지가 기준이 할 말입니다.</span></p>
+        </li>
+        <li>
+          <span class="k">✕</span>
+          <p class="t"><b>Context는 Baseline을 베끼지 않습니다</b>
+          <span>회사 기준 문장을 그대로 옮겨 놓고 우리 얘기라고 할 수 없습니다.
+          Context에는 <em>우리가 고른 것</em>만 적습니다.</span></p>
+        </li>
+        <li>
+          <span class="k">✕</span>
+          <p class="t"><b>코드는 층을 건너뛰지 않습니다</b>
+          <span>코드가 회사 기준은 어겼는데 Context는 지켰다면, 잘못은 코드가 아니라
+          <strong>Context에 있습니다.</strong> 회사가 막은 걸 Context가 허락해 준 거니까요.</span></p>
+        </li>
+        <li>
+          <span class="k">✕</span>
+          <p class="t"><b>빈 자리를 기존 코드로 메우지 않습니다</b>
+          <span>회사가 아직 안 정한 것을, 지금 쓰고 있다는 이유로 정해진 것처럼 만들지 않습니다.
+          빈 자리는 빈 자리로 둡니다.</span></p>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 09 ------------------------------------------------------------- -->
+  <section class="sec">
+    <div class="rail"><span class="num">09</span><span class="tag">빈 자리</span></div>
+    <div class="col">
+      <h2>안 정한 것과 빠뜨린 것은 다릅니다</h2>
+      <p class="sum">
+        Baseline은 잠겨 있지만 답이 다 차 있지는 않습니다. 질문은 그대로 두고,
+        아직 답을 못 정한 자리는 <code>미결정</code>이라고 <strong>적어 둡니다</strong>. 비워 두는 게 아니라 적어 둡니다.
+      </p>
+      <p class="body">
+        버전이 그렇습니다. Baseline이 버전에서 갖는 건 <b>최소 지원 버전</b> 하나뿐입니다.
+        실제로 몇 버전을 쓰는지, 언제 올리는지는 프로젝트마다 다르고 자주 바뀌니까
+        Context가 갖습니다.
+      </p>
+      <p class="body">
+        그리고 지금 그 최소 지원 버전은 <b>아직 정하지 않았습니다.</b>
+        빠뜨린 게 아니라, 안 정했다는 것 자체가 지금의 기준입니다.
+      </p>
+      <div class="note">
+        <p><b>그래서 점검할 때 그 자리를 채워주지 않습니다.</b> <code>미결정</code>인 줄은
+        <code>기준 미결정</code>으로 그대로 두고, 지금 쓰고 있는 값을
+        회사가 정한 것처럼 적어 넣지 않습니다.</p>
+        <p>나중에 최소 버전이 정해지면 Baseline 한 곳만 고치면 됩니다. 질문은 이미 자리에 있으니까요.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10 ------------------------------------------------------------- -->
+  <section class="sec">
+    <div class="rail"><span class="num">10</span><span class="tag">스킬 동작</span></div>
+    <div class="col">
+      <h2>스킬은 두 가지 일만 합니다</h2>
+      <p class="sum">
+        이미 있는 프로젝트를 이 기준에 비춰 보거나, 아직 없는 프로젝트를 이 기준으로 세웁니다.
+        다른 일은 하지 않습니다.
+      </p>
+
+      <div class="modes">
+        <div class="mode">
+          <div class="mode-h">
+            <span class="nm">점검 모드</span>
+            <span class="badge">읽기만 함</span>
+          </div>
+          <p>
+            8개 주제에 답이 있는지, 기술 26줄을 다 골랐는지, 21개 선이 실제 파일까지
+            이어지는지 확인합니다. Context가 말한 것과 코드가 하는 일이 같은지도 봅니다.
+          </p>
+          <p>
+            <b>고치지는 않습니다.</b> 둘이 다르면 어느 쪽이 맞는지 마음대로 정하지 않고
+            <code>문서-코드 불일치</code>라고 적어 둡니다. 못 본 건 못 봤다고 적습니다.
+          </p>
+          <ul class="steps">
+            <li>파일 목록 만들기</li><li>어느 문서가 어느 질문을 맡는지</li><li>8개 주제 확인</li>
+            <li>기술 26줄 맞춰 보기</li><li>21개 선 확인</li><li>코드와 맞춰 보기</li><li>보고</li>
+          </ul>
+        </div>
+
+        <div class="mode">
+          <div class="mode-h">
+            <span class="nm">셋업 모드</span>
+            <span class="badge">빈 프로젝트에만</span>
+          </div>
+          <p>
+            무엇보다 먼저 <b>이미 셋업된 프로젝트인지 확인합니다.</b> 이 확인을 통과하기 전에는
+            기준을 읽지도, 기술을 묻지도, 파일을 만들지도 않습니다. 이미 만들어진 프로젝트면
+            아무것도 건드리지 않고, 왜 그렇게 봤는지만 알려주고 멈춥니다.
+          </p>
+          <p>
+            통과하면 화면을 어디서 그릴지부터 정하고, 역할마다 <b>하나씩만</b> 설치합니다.
+            후보가 셋이라고 셋 다 깔지 않습니다.
+          </p>
+          <ul class="steps">
+            <li class="stop">이미 셋업됐는지 확인</li><li>Context 폴더 정하기</li><li>기술 하나씩 정하기</li>
+            <li>같이 써도 되는 조합인지 검사</li><li>프로젝트 생성</li><li>기본 Context 문서 생성</li>
+            <li>실제로 돌려보기</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="note">
+        <p><b>다 됐다는 말은 실제로 돌려본 뒤에만 합니다.</b> 설치, 타입 검사, 테스트, 빌드를
+        진짜 돌려 본 것만 보고합니다. 브라우저나 계정이 없어서 못 돌렸으면
+        됐다고 하지 않고 <code>못 돌림</code>이라고 적습니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <p class="colophon">
+    BASELINE.md — 프론트엔드 v2<br>
+    L1 잠김 · L2 열림 · L3 결과물 · 의존은 바로 옆 층까지
+  </p>
+
+</div>
+</body>
+</html>

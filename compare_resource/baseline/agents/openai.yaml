@@ -1,0 +1,4 @@
+interface:
+  display_name: "Baseline"
+  short_description: "BASELINE.md 기반 프론트엔드 감사 또는 셋업"
+  default_prompt: "$baseline을 사용해 프론트엔드 프로젝트를 감사하거나 BASELINE.md에 따라 셋업하세요. 셋업에서는 rendering을 application 기반보다 먼저 결정하고 router, build, data cache, API client 및 hosting runtime 호환성을 검증한 뒤 지도 필요 여부와 단일 지도 engine을 확정하세요."

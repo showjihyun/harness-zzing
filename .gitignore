@@ -1,0 +1,14 @@
+# 런타임 산출물입니다. 매 실행 재생성되므로 커밋하지 않습니다.
+.harness/verify.json
+.harness/latest-eval.json
+.harness/loop-state.json
+.harness/baseline-eval.json
+.harness/logs/
+
+# 로컬 설정 오버라이드
+harness.config.local
+.claude/settings.local.json
+
+# 도구 부산물
+.playwright-mcp/
+*.png

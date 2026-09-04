@@ -1,0 +1,32 @@
+# improvement log 후보입니다. 사양 6.5 의 키 순서를 바꾸지 않습니다.
+id: 2026-09-03-003
+date: 2026-09-03
+status: candidate
+symptom: 언어 팩의 examples.md 4종이 코어 문서의 내용을 복제해 같은 lesson 이 여러 자리에 정본으로 존재하게 되었고, 이미 문서 간 드리프트가 발생했습니다.
+evidence: |
+  references/harness-elements.md 는 승격 사다리 표에 대해 "아래 표는 언어에 관계없이 같고" 라고 스스로 밝히는데,
+  그 표의 0·1·2·5행이 java/typescript-frontend/typescript-backend/python 네 팩에 자구까지 복제되어 있었습니다.
+  rules/lesson-placement.rule.md 예시 2 와 rules/context-hygiene.rule.md 예시 1 의 표가 소유한
+  "판정 절차 / 정본 자리 / preferred_enforcement" 세 열도 팩 표가 상위집합으로 흡수했습니다.
+  언어와 무관한 관측 채널 행(OBS-C1 exit code, OBS-C3 diff)과 psql 조회 명령이 네 팩에 동일하게 반복되었습니다.
+  드리프트 실증: lombok.config 는 java/README.md 에는 있으나 java/backend/examples.md 4절에는 없고,
+  .oxlintrc.json / knip.json 은 typescript/README.md 에는 있으나 frontend/examples.md 4절에는 없었습니다.
+  improvement-log.example.yaml 5종이 모두 id 2026-08-09-001 을 쓰고 regression_check 블록이 자구까지 동일했습니다.
+  근거 리뷰: 하네스 원칙 리뷰 1항, 문서 일관성 리뷰 M4~M6.
+root_cause: 팩을 만들 때 "언어별 판을 제공한다" 를 코어 구조를 그대로 옮겨 적는 것으로 해석했습니다. 무엇이 언어에 따라 실제로 갈리는지(도구 이름과 규칙 코드)와 무엇이 갈리지 않는지(판정 절차, 사다리 단계, 공통 채널)를 구분하지 않아 델타가 아니라 사본이 만들어졌습니다.
+fix: 사다리 표에서 언어 무관 행을 빼고 3·4단계만 남겼고, 배치 표에서 코어 소유 열 3개를 제거했으며, OBS-C* 행과 psql 중복을 걷어냈습니다. 팩 예시의 id 를 구분하고 regression_check 를 코어 참조로 축약했습니다.
+recurrence_risk: medium
+harness_element: HE-3
+proposed_harness_change: 팩 문서는 코어의 델타만 담습니다. 새 팩을 만들 때 examples.md 는 관측된 필요가 생긴 뒤에 만들고, 코어가 "언어에 관계없이 같다" 고 표시한 내용은 링크로만 가리킵니다. 이 규약을 language/README.md 5절에 명시했습니다.
+preferred_enforcement: doc
+trust: untrusted
+regression_check: |
+  대상: REP-5(규약 문서 발견 경로), REP-6(범위 통제)
+  기준: 팩 문서가 줄어든 뒤에도 각 스택의 도구 이름과 규칙 코드를 찾는 경로가 끊기지 않을 것.
+        코어와 팩이 같은 문장을 두 번 말하지 않을 것.
+  수행한 검증: 마크다운 상대 링크 632건 전수 검사에서 끊김 0.
+                examples.md 4종에서 코어 복제분 제거.
+  남은 것: 문서 중복은 기계 판정이 어려워 회귀를 자동으로 잡지 못합니다.
+           harness-gardener 의 정기 청소에서 "코어와 팩이 같은 표를 갖는가" 를 신호로 삼아야 합니다.
+owner: unassigned
+expires: 2026-12-03

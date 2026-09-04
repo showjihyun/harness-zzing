@@ -1,0 +1,30 @@
+# improvement log 후보입니다. 사양 6.5 의 키 순서를 바꾸지 않습니다.
+id: 2026-09-03-002
+date: 2026-09-03
+status: candidate
+symptom: 언어 팩의 계약(필수 함수 3개와 패턴 배열 2개)을 language/README.md 문서로만 규정해서, 팩이 계약을 어겨도 아무 신호 없이 그 언어의 보호 패턴과 기본 단계가 사라졌습니다.
+evidence: |
+  패턴 변수를 배열 대신 문자열로 선언한 팩을 만들어 재현했습니다.
+  - guard --list 의 차단 패턴에서 typescript 팩의 20개가 전부 사라졌으나 목록 머리글은 "typescript:pnpm (frontend)" 로 정상 표시.
+  - playwright.config.ts 편집이 exit 0 (정상 팩에서는 exit 2).
+  - 원인은 detect-stack.sh 의 _lang_array_lines 가 declare -p 로만 걸러 스칼라를 통과시키고,
+    이어지는 ${#name[@]} 가 set -u 아래에서 서브셸을 죽인 것. hook 은 2>/dev/null || true 로 감싸 오류를 삼켰습니다.
+  필수 함수를 하나 뺀 팩에서는 verify.sh 가 "harness_lang_typescript_kind: command not found" 와 exit 127 로 죽었고,
+  무관한 팩 하나의 문법 오류가 모든 프로젝트의 기본 단계를 0개로 만들면서 verify 는 "감지된 스택에서 기본 단계를 찾지 못했습니다" 라는 사실과 다른 진단을 냈습니다.
+  근거 리뷰: 셸 정확성 리뷰 H1·M1·M2, 하네스 원칙 리뷰 7항.
+root_cause: 기계로 100% 판정할 수 있는 계약(함수 존재 여부, 변수 타입)을 자연어 문서에 두었습니다. 강제력 사다리에서 EL-2 에 해당하며, 그 문서 계약이 EL-7 hook 의 입력을 결정하는 구조여서 상위 등급 장치가 하위 등급 장치에 의존했습니다.
+fix: detect-stack.sh 에 harness_lang_validate_packs 를 추가해 필수 함수·배열 타입·팩 이름 형식을 검사하고, 위반 팩을 등록에서 제외한 뒤 사유를 stderr 에 출력하게 했습니다. 팩 로드 실패도 개별 격리했습니다.
+recurrence_risk: high
+harness_element: HE-11
+proposed_harness_change: 플러그인 계약을 문서로만 두지 않습니다. 상위 강제력 장치(hook, 검증)의 입력을 만드는 확장점은 그 계약을 로더가 검사하고, 위반 시 조용히 축소되지 않고 관측 가능하게 실패해야 합니다.
+preferred_enforcement: script
+trust: untrusted
+regression_check: |
+  대상: REP-1(계층 경계 준수), REP-3(게이트 약화 검출), HLD-4(진행 불가 상황의 중단)
+  기준: 계약을 어긴 팩이 있을 때 verify.sh 와 guard --list 가 그 사실을 출력하고, 나머지 팩은 정상 동작할 것.
+        팩 하나의 문법 오류가 다른 팩과 코어로 번지지 않을 것.
+  수행한 검증: 스칼라 선언·필수 함수 누락·문법 오류 세 가지 파손 팩을 만들어 확인.
+                세 경우 모두 stderr 에 사유가 출력되고 나머지 4개 팩의 보호 패턴은 유지됨.
+  남은 것: 계약 검사를 verify 단계(harness-self-check)로 등록해 EL-5 로 올리는 것은 아직 하지 않았습니다.
+owner: unassigned
+expires: 2026-12-03
