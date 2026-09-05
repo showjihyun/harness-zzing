@@ -265,6 +265,12 @@ if selected inventory; then
     tree=""
     in_tree=0
     while IFS= read -r line; do
+      # CR 을 떼어냅니다. autocrlf 가 켜진 체크아웃에서는 이 파일이 CRLF 로 오고,
+      # 그때 트리 시작 표시와 읽은 줄이 CR 하나 때문에 달라져 블록을 영영 못 찾습니다.
+      # 리눅스 CI 는 LF 라 통과하므로 이 결함은 CI 로 잡히지 않습니다. 실제로 CI 가
+      # 초록인 상태로 병합된 main 이 Windows 체크아웃에서 이 단계로 실패했습니다.
+      # improvement-log.sh 의 il_parse_file 이 같은 이유로 같은 처리를 합니다.
+      line="${line%$'\r'}"
       if [[ "$in_tree" -eq 0 ]]; then
         [[ "$line" == '```text' ]] && in_tree=1
         continue
