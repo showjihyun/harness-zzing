@@ -207,28 +207,54 @@ $(failing_step_report)
 PROMPT
 }
 
-# 루프 시작 시점의 더티 목록. 이 시점에 이미 바뀌어 있던 파일은 에이전트가 만든
-# 변경이 아니므로 판정에서 제외합니다. 제외하지 않으면 루프를 돌리기 전부터 열려
-# 있던 무관한 편집을 에이전트 탓으로 돌려 1라운드에서 곧바로 중단됩니다.
-dirty_paths() {
-  git -C "$ROOT" status --porcelain 2>/dev/null | sed 's/^...//' | sort -u || true
+# 보안 민감 경로의 **내용 스냅숏**을 냅니다. "경로 내용해시" 줄의 목록입니다.
+#
+# 경로 집합만 비교하면 두 가지를 놓칩니다.
+#   1. 루프 시작 시점에 이미 더티했던 .env 를 에이전트가 다시 쓰면, 경로 집합이
+#      그대로여서 영영 걸리지 않습니다. 기준선에 있다는 이유로 면제됩니다.
+#   2. 에이전트가 변경을 커밋하면 그 경로가 git status 에서 사라져 보이지 않습니다.
+# 그래서 (a) 시작 시점 커밋 이후의 변경 경로까지 포함하고, (b) 경로가 아니라
+# 내용 해시를 비교합니다. AGENTS.md 의 "보안에 닿는 변경은 사람 검토로
+# 에스컬레이션합니다" 는 경로가 아니라 변경에 대한 약속입니다.
+#
+# LC_ALL=C 를 붙이는 이유: sort 는 로케일 순서로 정렬하고 비교는 바이트 단위라
+# 비-C 로케일에서 두 목록의 순서가 어긋날 수 있습니다.
+security_snapshot() {
+  local p
+  {
+    git -C "$ROOT" status --porcelain 2>/dev/null | sed 's/^...//'
+    [[ -n "${SECURITY_BASE_REV}" ]] && git -C "$ROOT" diff --name-only "${SECURITY_BASE_REV}" 2>/dev/null
+  } | LC_ALL=C sort -u | grep -Ei "$SECURITY_PATTERNS" | while IFS= read -r p; do
+    [[ -n "$p" ]] || continue
+    if [[ -f "${ROOT}/${p}" ]]; then
+      printf '%s %s\n' "$p" "$(git -C "$ROOT" hash-object -- "${ROOT}/${p}" 2>/dev/null || printf 'unhashable')"
+    else
+      printf '%s deleted\n' "$p"
+    fi
+  done
 }
+
+SECURITY_BASE_REV=""
 SECURITY_BASELINE=""
 if have_cmd git && git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  SECURITY_BASELINE="$(dirty_paths)"
+  SECURITY_BASE_REV="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)"
+  SECURITY_BASELINE="$(security_snapshot)"
 fi
 SECURITY_MATCHED=""
 
 security_sensitive_change() {
   have_cmd git || return 1
   git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 1
-  local now new
-  now="$(dirty_paths)"
-  [[ -n "$now" ]] || return 1
-  # 시작 시점 이후에 새로 나타난 경로만 봅니다.
-  new="$(comm -13 <(printf '%s\n' "$SECURITY_BASELINE") <(printf '%s\n' "$now") 2>/dev/null || printf '%s\n' "$now")"
-  [[ -n "$new" ]] || return 1
-  SECURITY_MATCHED="$(printf '%s\n' "$new" | grep -Ei "$SECURITY_PATTERNS" || true)"
+  local now
+  now="$(security_snapshot)"
+  [[ "$now" != "$SECURITY_BASELINE" ]] || return 1
+  # 기준선에 없던 줄(= 새로 생겼거나 내용이 바뀐 경로)만 보고합니다.
+  SECURITY_MATCHED="$(
+    comm -13 <(printf '%s\n' "$SECURITY_BASELINE" | LC_ALL=C sort) \
+             <(printf '%s\n' "$now" | LC_ALL=C sort) 2>/dev/null \
+      || printf '%s\n' "$now"
+  )"
+  SECURITY_MATCHED="$(printf '%s\n' "$SECURITY_MATCHED" | sed 's/ [0-9a-f]\{40\}$//; s/ unhashable$//; /^$/d')"
   [[ -n "$SECURITY_MATCHED" ]]
 }
 
