@@ -136,12 +136,19 @@ if selected protection; then
     report_fail protection "guard-evaluation-tampering.sh 를 찾을 수 없습니다"
   else
     empty_dir="$(mktemp -d)"
-    trap 'rm -rf "${empty_dir}"' EXIT
+    nolang_dir="$(mktemp -d)"
+    trap 'rm -rf "${empty_dir}" "${nolang_dir}"' EXIT
+    _blocked_count() { sed -n '/^blocked:/,/^warned:/p' | grep -c '^  ' || true; }
+    # 팩을 병합한 목록과, 팩 디렉터리를 비워 코어만 남긴 목록을 각각 셉니다.
+    # 상수와 비교하지 않는 이유: 코어 목록이 자라면 상수가 조용히 추월당해
+    # "팩이 병합되었는가" 단정이 영원히 통과합니다. 실제로 상수 12 는 코어 14 에
+    # 추월당해 죽어 있었습니다. 두 실측값을 비교하면 그 부패가 생기지 않습니다.
     listing="$(CLAUDE_PROJECT_DIR="${empty_dir}" bash "$guard" --list 2>/dev/null || true)"
-    blocked="$(printf '%s' "$listing" | sed -n '/^blocked:/,/^warned:/p' | grep -c '^  ' || true)"
-    # 코어 목록만 12개입니다. 팩이 병합되면 그보다 많아야 합니다.
-    if [[ "$blocked" -le 12 ]]; then
-      report_fail protection "스택 미감지 상태에서 차단 패턴이 ${blocked}개뿐입니다. 언어별 보호가 감지에 의존하고 있습니다"
+    blocked="$(printf '%s' "$listing" | _blocked_count)"
+    core_only="$(CLAUDE_PROJECT_DIR="${empty_dir}" HARNESS_LANGUAGE_DIR="${nolang_dir}" \
+      bash "$guard" --list 2>/dev/null | _blocked_count || true)"
+    if [[ "$blocked" -le "$core_only" ]]; then
+      report_fail protection "스택 미감지 상태의 차단 패턴 ${blocked}개가 코어 단독 ${core_only}개보다 많지 않습니다. 언어별 보호가 병합되지 않았습니다"
     else
       # 대표 패턴 몇 개가 실제로 차단되는지 확인합니다.
       miss=""
@@ -154,7 +161,7 @@ if selected protection; then
       if [[ -n "$miss" ]]; then
         report_fail protection "스택 미감지 상태에서 차단되지 않은 파일:${miss}"
       else
-        report_pass protection "보호 패턴 ${blocked}개가 감지와 무관하게 병합됩니다"
+        report_pass protection "보호 패턴 ${blocked}개(코어 ${core_only} + 팩)가 감지와 무관하게 병합됩니다"
       fi
     fi
   fi
@@ -200,10 +207,19 @@ if selected log-schema; then
   while IFS= read -r f; do examples+=("$f"); done < <(
     find "${HARNESS_DIR}" -name '*improvement-log*.yaml' -o -name '*.example.yaml' | sort -u
   )
+  # 프로젝트가 실제로 쌓은 로그도 함께 봅니다. 번들 예시만 검사하면 진짜 로그의
+  # 스키마 위반이 그대로 통과합니다. 이 단계가 지키려는 것은 예시가 아니라 로그입니다.
+  proj_log="${HARNESS_PROJECT_ROOT_RESOLVED}/improvement-log"
+  if [[ -d "$proj_log" ]]; then
+    while IFS= read -r f; do examples+=("$f"); done < <(find "$proj_log" -name '*.yaml' -type f | sort)
+  fi
   if [[ ${#examples[@]} -eq 0 ]]; then
-    report_pass log-schema "검사할 예시가 없습니다"
+    # 입력이 0건인 것은 통과가 아닙니다. 번들은 항상 예시를 싣고 있으므로
+    # 0건은 예시가 제거되었다는 뜻이고, 통과 처리하면 게이트를 지우는 것이
+    # 게이트를 초록으로 만드는 방법이 됩니다.
+    report_fail log-schema "검사할 예시가 하나도 없습니다. 번들의 improvement-log 예시가 제거되었는지 확인하십시오"
   elif out="$("${SCRIPT_DIR}/improvement-log.sh" validate "${examples[@]}" 2>&1)"; then
-    report_pass log-schema "예시 ${#examples[@]}건이 스키마를 만족합니다"
+    report_pass log-schema "예시·로그 ${#examples[@]}건이 스키마를 만족합니다"
   else
     report_fail log-schema "$(printf '%s' "$out" | tail -n 5)"
   fi
