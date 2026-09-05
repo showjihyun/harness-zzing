@@ -25,10 +25,11 @@ HARNESS_PROTECTED_PATTERNS=(
   "evaluation/*"
   "harness/rules/*"
   "harness/hooks/*"
-  "harness/scripts/verify.sh"
-  "harness/scripts/eval.sh"
-  "harness/scripts/pass-threshold.sh"
-  "harness/scripts/self-check.sh"
+  # scripts/ 전체를 봅니다. 개별 파일을 열거하면 새 스크립트가 목록에 빠진 채
+  # 게이트를 지탱하게 됩니다. 실제로 improvement-log.sh 와 loop.sh 가 그 상태였습니다.
+  # improvement-log.sh 는 필수 단계 log-schema 의 판정을 전부 수행하고,
+  # loop.sh 는 반복 예산과 보안 에스컬레이션 패턴을 소유합니다. 둘 다 고치면 게이트가 무력해집니다.
+  "harness/scripts/*.sh"
   "harness/scripts/lib/*"
   "harness/language/*/lang.sh"
   ".harness/latest-eval.json"

@@ -11,7 +11,7 @@
 | `settings.hooks.json` | Claude Code `settings.json` 의 `hooks` 블록에 병합할 JSON 조각 |
 | `stop-verify-gate.sh` | Stop hook. 검증 없이 작업을 끝내는 것을 차단 |
 | `guard-evaluation-tampering.sh` | PreToolUse hook. 평가·게이트 규정 파일의 변경을 차단 |
-| `../language/<언어>/lang.sh` | 언어별 차단·경고 패턴. guard hook 이 감지된 스택과 kind 에 맞는 것을 코어 목록에 합칩니다 |
+| `../language/<언어>/lang.sh` | 언어별 차단·경고 패턴. guard hook 이 로드된 **모든** 팩의 것을 감지 결과와 무관하게 코어 목록에 합칩니다 (아래 "보호 목록" 절) |
 
 ## 각 hook 이 강제하는 것
 
