@@ -5,7 +5,7 @@ status: candidate
 symptom: 가드가 자기 스위치를 지키지 않습니다. 훅을 등록하는 .claude/settings.json 이 보호 목록에 없어, 그 파일 하나를 고치면 PreToolUse 평가 가드와 Stop 검증 게이트가 함께 사라집니다.
 evidence: "2026-09-05 리뷰 세션. 가드에 payload 를 직접 파이프해 확인: .claude/settings.json exit 0, harness/scripts/eval.sh exit 2, AGENTS.md exit 0. guard --list 의 blocked 목록에 claude 또는 settings 를 포함하는 항목 0건. harness/hooks/ 를 보호하면서 그 훅을 등록하는 파일을 보호하지 않으므로 훅 본체를 지키는 의미가 상실됩니다. 편집 1회로 완결됩니다. 같은 세션에서 가드의 다른 두 결함도 실측되었습니다: cp 는 검사하지 않아 보호 파일을 그대로 덮어쓸 수 있고(미탐), heredoc 본문의 perl 코드를 셸 리다이렉션으로 읽어 fixture 생성을 차단했습니다(오탐, 2026-09-05-004 와 같은 계열)."
 root_cause: 보호 목록을 "평가 결과의 의미를 바꾸는 파일" 로 정의하면서 평가 장치를 실행시키는 설정 파일을 그 정의에 넣지 않았습니다. 2026-09-03-001 과 같은 계열의 누락입니다. 그때는 보호 범위를 감지 결과에 의존시켰고, 이번에는 보호 범위가 자기 실행 조건을 포함하지 않습니다.
-fix: 아직 고치지 않았습니다. 후보는 .claude/settings.json 을 코어 보호 목록에 넣는 것입니다. settings.local.json 은 개인 설정이라 상시 차단이 정당한지, 훅 등록 경로가 사용자 설정과 프로젝트 설정 두 곳인데 프로젝트 쪽만 막아 충분한지 함께 판정해야 합니다.
+fix: "보호 목록에 게이트의 실행 조건을 넣었습니다: .claude/settings.json, .claude/settings.local.json, .github/workflows/harness.yml, .github/CODEOWNERS. settings.local.json 도 막았습니다. hooks 블록과 env 를 그쪽에도 쓸 수 있어 상시 우회가 가능했기 때문입니다. 다른 워크플로는 경고에 두어 정상 작업을 막지 않습니다. 사용자 설정(~/.claude)은 저장소 밖이라 여전히 닿지 않습니다. 함께 넣은 것: 복사 계열 명령을 쓰기 구문 검사에 추가, 사후 검출 hook(PostToolUse)과 감사 기록, CI 와 CODEOWNERS. 회귀 테스트는 self-check 의 protection 탐침에 스위치 2건을 더한 것입니다. 커밋 0cc42b0, 6ad2f5f, 1f6303f."
 recurrence_risk: high
 harness_element: HE-10
 proposed_harness_change: 보호 목록은 평가 파일뿐 아니라 그 평가를 실행시키는 설정까지 포함합니다. 게이트를 지키는 범위에는 게이트의 실행 조건이 들어갑니다.
