@@ -34,6 +34,7 @@ usage() {
   links       번들 안 마크다운의 상대 링크가 전부 실재하는가
               HARNESS_SELF_CHECK_LINK_DIRS 로 프로젝트 문서를 검사 대상에 더할 수 있습니다
   log-schema  번들이 제공하는 improvement-log 예시가 스키마를 만족하는가
+  inventory   번들의 스크립트가 README 트리에 전부 등장하는가
 
 옵션:
   --only <검사>   지정한 검사만 실행합니다. 여러 번 지정할 수 있습니다.
@@ -47,7 +48,7 @@ usage() {
 USAGE
 }
 
-CHECKS=(syntax packs protection links log-schema)
+CHECKS=(syntax packs protection links log-schema inventory)
 ONLY=()
 
 while [[ $# -gt 0 ]]; do
@@ -152,7 +153,14 @@ if selected protection; then
     else
       # 대표 패턴 몇 개가 실제로 차단되는지 확인합니다.
       miss=""
-      for p in tsconfig.json checkstyle.xml ruff.toml .golangci.yml clippy.toml; do
+      # 파일명 패턴과 **경로 패턴**을 함께 봅니다. 파일명만 보면 to_relative 나 경로
+      # 일치 규칙이 깨져도 이 검사가 통과합니다. 실제로 보호 목록을 hooks/lib/guard-lib.sh
+      # 로 옮길 때 to_relative 의 이스케이프가 깨져 경로에서 "/" 를 전부 지웠고,
+      # harness/scripts/*.sh 를 포함한 모든 경로 패턴이 빗나갔는데 이 검사는 통과했습니다.
+      # 파일명 탐침만으로는 죽은 단언이 됩니다.
+      for p in tsconfig.json checkstyle.xml ruff.toml .golangci.yml clippy.toml \
+               harness/scripts/verify.sh harness/rules/RULES.md .harness/verify.json \
+               .claude/settings.json .github/workflows/harness.yml; do
         c=0
         printf '{"tool_input":{"file_path":"%s"}}' "$p" \
           | CLAUDE_PROJECT_DIR="${empty_dir}" bash "$guard" >/dev/null 2>&1 || c=$?
@@ -229,6 +237,57 @@ if selected log-schema; then
     report_pass log-schema "예시·로그 ${#examples[@]}건이 스키마를 만족합니다"
   else
     report_fail log-schema "$(printf '%s' "$out" | tail -n 5)"
+  fi
+fi
+
+# --- 6. inventory ---------------------------------------------------------------
+# 번들의 스크립트가 README 트리에 등장하는가.
+#
+# links 검사는 마크다운 링크의 **대상이 존재하는지**만 봅니다. 파일을 추가하고 트리를
+# 갱신하지 않으면 링크가 끊기지 않으므로 아무 신호도 나오지 않습니다. 실제로
+# self-check.sh 는 이 저장소의 다섯 단계를 전부 수행하면서도 트리에 없었고, 그 사실이
+# 오래 드러나지 않았습니다. 2026-09-06 라운드에서 추가한 세 파일도 같은 상태였습니다.
+#
+# 이 검사가 EL-5 로 올리는 지침: "파일을 추가하면 README 트리도 갱신한다."
+# 근거: improvement-log/2026-09-04-001 (개수 표기와 실제가 어긋나는 것을 기계가 보지 않음),
+#       2026-09-05-001 (문서와 구현의 불일치가 리뷰 전까지 신호를 내지 않음). GC-7.
+#
+# 파일명만 봅니다. 경로까지 요구하면 트리의 요약 표기(_template/ (README.md, lang.sh, …))를
+# 전부 펼쳐야 하고, 그 형식은 사람이 읽기 위한 것이라 강제 대상이 아닙니다.
+if selected inventory; then
+  readme="${HARNESS_DIR}/README.md"
+  if [[ ! -f "$readme" ]]; then
+    report_fail inventory "번들 README 를 찾을 수 없습니다: ${readme}"
+  else
+    # 트리 블록 안에서만 찾습니다. 파일 전체를 보면 산문에 한 번 언급된 것만으로
+    # 통과해 검사가 죽습니다. 첫 구현이 그랬고, 트리에서 self-check.sh 를 지워도
+    # 통과했습니다. 자기 자신을 지키는 검사도 죽은 단언이 될 수 있습니다.
+    tree=""
+    in_tree=0
+    while IFS= read -r line; do
+      if [[ "$in_tree" -eq 0 ]]; then
+        [[ "$line" == '```text' ]] && in_tree=1
+        continue
+      fi
+      [[ "$line" == '```' ]] && break
+      tree="${tree}${line}"$'\n'
+    done < "$readme"
+    missing=""
+    count=0
+    while IFS= read -r f; do
+      count=$((count + 1))
+      b="${f##*/}"
+      [[ "$tree" == *"${b}"* ]] || missing="${missing} ${f#"${HARNESS_DIR}/"}"
+    done < <(find "${HARNESS_DIR}" -name '*.sh' -type f | sort)
+    if [[ -z "$tree" ]]; then
+      report_fail inventory "README 에서 파일 트리 블록을 찾지 못했습니다"
+    elif [[ "$count" -eq 0 ]]; then
+      report_fail inventory "번들에서 스크립트를 하나도 찾지 못했습니다"
+    elif [[ -n "$missing" ]]; then
+      report_fail inventory "README 트리에 없는 스크립트:${missing} — harness/README.md 를 갱신합니다"
+    else
+      report_pass inventory "스크립트 ${count}개가 전부 README 트리에 등장합니다"
+    fi
   fi
 fi
 

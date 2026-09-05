@@ -20,7 +20,7 @@ usage() {
 
 종료 코드:
   0  score >= threshold
-  1  score < threshold
+  1  score < threshold 이거나 필수 단계가 하나 이상 실패했습니다
   2  .harness/latest-eval.json 이 없거나 읽을 수 없습니다.
 USAGE
 }
@@ -76,12 +76,27 @@ else
   [[ "$THRESHOLD" =~ ^[0-9]+$ ]] || die "threshold 가 정수가 아닙니다: ${THRESHOLD}" 2
 fi
 
-if [[ "$SCORE" -ge "$THRESHOLD" ]]; then
-  say "합격: score ${SCORE} >= threshold ${THRESHOLD}"
+# 필수 단계 실패는 점수보다 앞섭니다 (harness-evaluator 의 EV-5). eval.sh 가 기록한
+# failed_required 를 봅니다. 이 키가 없으면 판정하지 않고 실패합니다. 없는 것을 0 으로
+# 가정하면 이 키 이전 형식의 파일이 조용히 합격으로 읽힙니다. 게이트는 근거가 없을 때
+# 열지 않고 닫습니다. 근거: 감지 실패를 fail-open 으로 두었던 improvement-log/2026-09-03-001.
+FAILED_REQUIRED="$(json_num_field "$CONTENT" failed_required)"
+if [[ ! "$FAILED_REQUIRED" =~ ^[0-9]+$ ]]; then
+  log_error "${HARNESS_EVAL_JSON} 에 failed_required 가 없습니다."
+  log_error "사유: 이 키를 기록하기 이전 형식의 파일입니다. harness/scripts/eval.sh 를 다시 실행하십시오."
+  exit 2
+fi
+
+if [[ "$FAILED_REQUIRED" -eq 0 && "$SCORE" -ge "$THRESHOLD" ]]; then
+  say "합격: score ${SCORE} >= threshold ${THRESHOLD}, 필수 단계 실패 0건"
   exit 0
 fi
 
-say "불합격: score ${SCORE} < threshold ${THRESHOLD}"
+if [[ "$FAILED_REQUIRED" -gt 0 ]]; then
+  say "불합격: 필수 단계 ${FAILED_REQUIRED}건이 실패했습니다 (score ${SCORE} 는 판정에 쓰지 않습니다)"
+else
+  say "불합격: score ${SCORE} < threshold ${THRESHOLD}"
+fi
 LARGEST="$(printf '%s' "$CONTENT" | sed -n 's/.*"largest_failure"[[:space:]]*:[[:space:]]*{\([^}]*\)}.*/\1/p')"
 if [[ -n "$LARGEST" ]]; then
   say "가장 큰 실패: $(json_str_field "$LARGEST" layer) — $(json_str_field "$LARGEST" detail)"

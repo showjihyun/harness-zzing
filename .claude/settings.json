@@ -24,6 +24,19 @@
         ]
       }
     ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/harness/hooks/detect-guarded-change.sh\"",
+            "timeout": 15,
+            "statusMessage": "보호 파일 변경 검출 중"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [

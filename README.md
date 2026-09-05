@@ -276,9 +276,10 @@ shows up in a specific layer rather than as one opaque failure:
 | `protection` | behavior | Protection patterns are merged independently of stack detection. This is the repository's evaluation-integrity gate. |
 | `links` | quality | Every relative link in the documents resolves. A broken discovery path makes a document effectively absent. |
 | `log-schema` | quality | The bundle's shipped improvement-log examples satisfy the schema. |
+| `inventory` | quality | Every script in the bundle appears in the README file tree. |
 
-The pass line is `HARNESS_THRESHOLD=90` here, set so that a single failing step drops the total below
-it. Loop budget: 8 iterations max, 3 repeats of the same failure, 2 rounds without improvement.
+The pass line is `HARNESS_THRESHOLD=90` here. "Any failing step means failure" is not encoded in that number:
+`eval.sh` records `failed_required` and forces `pass: false` whenever a required step failed, whatever the score. Loop budget: 8 iterations max, 3 repeats of the same failure, 2 rounds without improvement.
 
 **Do not weaken a gate to make it pass.** Deleting a check, disabling it, adding a skip comment or
 extending an exception list is not a fix — that is `EI` territory, and it is the rule namespace with
@@ -415,6 +416,9 @@ Rules that exist only as sentences get skipped when things get busy. Hooks (`HE-
 | --- | --- | --- |
 | [`stop-verify-gate.sh`](harness/hooks/stop-verify-gate.sh) | Stop | At the moment the agent declares it is finished, checks `.harness/verify.json`. If verification never ran or `status` is not `pass`, it blocks the stop and returns what failed and what to do next on stderr. |
 | [`guard-evaluation-tampering.sh`](harness/hooks/guard-evaluation-tampering.sh) | PreToolUse | Blocks edits to evaluation and gate-defining files. |
+| [`detect-guarded-change.sh`](harness/hooks/detect-guarded-change.sh) | PostToolUse | Detects, by content hash, that a protected file actually changed, and records it in `.harness/guard-events.log`. It does not block. |
+
+**Local hooks cannot close every bypass.** They run where the agent runs. The list of write commands never closes (block `cp` and `mv` remains), a write can happen inside a program the hook cannot read, and editing the file that registers the hooks removes the hooks themselves. So the integrity guarantee lives outside the repository: [`.github/workflows/harness.yml`](.github/workflows/harness.yml) runs `verify.sh` on a clean checkout and fails any pull request that touches a protected file without the `harness-change` label and a human review. The limits and the reasoning are in [harness/hooks/README.md](harness/hooks/README.md).
 
 Merge [`harness/hooks/settings.hooks.json`](harness/hooks/settings.hooks.json) into your Claude Code
 `settings.json` `hooks` block. `HARNESS_SKIP_STOP_GATE=1` bypasses the stop gate and records the

@@ -245,8 +245,9 @@ AI 코딩 에이전트가 일하는 *환경*을 만드는 킷입니다. 에이�
 | `protection` | behavior | 보호 패턴이 스택 감지와 무관하게 병합되는가. 이 저장소의 평가 무결성 게이트입니다. |
 | `links` | quality | 문서의 상대 링크가 전부 실재하는가. 발견 경로가 끊기면 문서는 없는 것과 같습니다. |
 | `log-schema` | quality | 번들이 제공하는 개선 로그 예시가 스키마를 만족하는가. |
+| `inventory` | quality | 번들의 스크립트가 README 트리에 전부 등장하는가. |
 
-합격선은 `HARNESS_THRESHOLD=90` 이며, 한 단계라도 실패하면 총점이 그 아래로 떨어지도록 잡았습니다. 루프 예산은 최대 8회 반복, 동일 실패 3회, 2라운드 연속 개선 없음입니다.
+합격선은 `HARNESS_THRESHOLD=90` 입니다. "한 단계라도 실패하면 불합격" 은 이 숫자가 아니라 `eval.sh` 의 `failed_required` 판정이 담당합니다. 필수 단계가 하나라도 실패하면 총점과 무관하게 `pass` 는 `false` 입니다. 루프 예산은 최대 8회 반복, 동일 실패 3회, 2라운드 연속 개선 없음입니다.
 
 **게이트를 통과시키려고 게이트를 약화시키지 않습니다.** 검사 삭제, 비활성화, skip 주석 추가, 예외 목록 확장은 수정이 아닙니다. 그것은 `EI` 의 영역이고, `EI` 가 두 번째로 높은 우선순위를 가진 데에는 이유가 있습니다.
 
@@ -363,6 +364,9 @@ UT ▸ EI ▸ LB ▸ PG ▸ CC ▸ LP ▸ CX ▸ GC
 | --- | --- | --- |
 | [`stop-verify-gate.sh`](harness/hooks/stop-verify-gate.sh) | Stop | 에이전트가 "다 했습니다"라고 선언하는 순간 `.harness/verify.json` 을 확인합니다. 검증이 실행되지 않았거나 `status` 가 `pass` 가 아니면 종료를 차단하고, 무엇이 실패했는지와 다음 조치를 stderr 로 돌려줍니다. |
 | [`guard-evaluation-tampering.sh`](harness/hooks/guard-evaluation-tampering.sh) | PreToolUse | 평가·게이트 규정 파일의 변경을 차단합니다. |
+| [`detect-guarded-change.sh`](harness/hooks/detect-guarded-change.sh) | PostToolUse | 보호 파일이 실제로 바뀌었는지 내용 해시로 사후 검출하고 `.harness/guard-events.log` 에 남깁니다. 막지는 않습니다. |
+
+**로컬 hook 은 우회를 다 막지 못합니다.** 에이전트가 도는 곳에서 돌기 때문입니다. 명령 열거는 닫히지 않고(`cp` 를 막으면 `mv` 가 남습니다), 쓰기가 hook 이 읽을 수 없는 프로그램 안에서 일어날 수 있으며, hook 을 등록하는 파일을 고치면 hook 자체가 사라집니다. 그래서 무결성 보장은 저장소 밖에 둡니다. [`.github/workflows/harness.yml`](.github/workflows/harness.yml) 이 깨끗한 체크아웃에서 `verify.sh` 를 돌리고, 보호 파일이 바뀐 PR 은 `harness-change` 라벨과 사람 검토 없이 통과하지 못하게 합니다. 한계와 설계 근거는 [harness/hooks/README.md](harness/hooks/README.md) 를 읽습니다.
 
 [`harness/hooks/settings.hooks.json`](harness/hooks/settings.hooks.json) 을 Claude Code `settings.json` 의 `hooks` 블록에 병합합니다. `HARNESS_SKIP_STOP_GATE=1` 은 stop 게이트를 우회하고 그 사실을 stderr 에 기록합니다. `stop_hook_active` 는 무한 루프를 막기 위해 즉시 통과시킵니다.
 

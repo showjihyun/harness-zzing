@@ -4,49 +4,10 @@
 # exit 0: 허용(경고는 stderr) / exit 2: 차단(stderr 사유가 에이전트에게 전달됨)
 set -euo pipefail
 
-# ---------------------------------------------------------------------------
-# 코어 보호 목록. 언어에 고정되지 않은 하네스 자체의 파일만 담습니다.
-# 언어별 목록(eslint, tsconfig, checkstyle, ruff …)은 harness/language/<언어>/lang.sh 가 소유하며,
-# **감지 결과와 무관하게 모든 팩의 목록이 합쳐집니다**(아래 "언어 팩 패턴 병합" 참조).
-# 프로젝트 고유 추가분은 이 배열에 적습니다.
-#
-# 패턴 규칙:
-#   - '/' 가 없는 패턴은 경로 전체와 파일명 양쪽에 대해 검사합니다.
-#   - '/' 가 있는 패턴은 경로 전체와 **하위 경로 접미사** 양쪽에 대해 검사합니다.
-#     (하네스를 tools/harness/ 로 벤더링하거나 monorepo 하위 패키지를 편집할 때도 걸립니다)
-# ---------------------------------------------------------------------------
-
-# 차단 대상: 이 파일들이 바뀌면 평가 결과의 의미가 달라집니다.
-HARNESS_PROTECTED_PATTERNS=(
-  "harness.config"
-  "harness.config.local"
-  "harness/evaluation/*"
-  # 프로젝트가 실체화한 평가 세트. 번들 템플릿과 같은 이유로 에이전트의 자가 수정 대상이 아닙니다.
-  "evaluation/*"
-  "harness/rules/*"
-  "harness/hooks/*"
-  # scripts/ 전체를 봅니다. 개별 파일을 열거하면 새 스크립트가 목록에 빠진 채
-  # 게이트를 지탱하게 됩니다. 실제로 improvement-log.sh 와 loop.sh 가 그 상태였습니다.
-  # improvement-log.sh 는 필수 단계 log-schema 의 판정을 전부 수행하고,
-  # loop.sh 는 반복 예산과 보안 에스컬레이션 패턴을 소유합니다. 둘 다 고치면 게이트가 무력해집니다.
-  "harness/scripts/*.sh"
-  "harness/scripts/lib/*"
-  "harness/language/*/lang.sh"
-  # 런타임 산출물 전체입니다. 개별 파일을 열거했을 때 baseline-eval.json 과
-  # loop-state.json 이 빠져 있었습니다. baseline-eval.json 은 회귀 판정의 기준선이라,
-  # 점수를 못 올리는 에이전트가 기준선을 낮추면 모든 결과가 개선이 됩니다.
-  # 에이전트가 이 디렉터리를 손으로 고칠 일은 없습니다. 전부 스크립트가 씁니다.
-  ".harness/*"
-)
-
-# 경고 대상: 차단하지는 않지만 평가에 영향을 줄 수 있어 사실을 알립니다.
-HARNESS_WARN_PATTERNS=(
-  ".github/workflows/*"
-  ".gitlab-ci.yml"
-  "sonar-project.properties"
-  "codecov.yml"
-  "improvement-log/*"
-)
+# 보호·경고 패턴과 경로 판정 함수는 hooks/lib/guard-lib.sh 가 소유합니다.
+# 사후 검출(detect-guarded-change.sh)이 **같은 목록과 같은 일치 규칙**을 써야 하기
+# 때문입니다. 목록이 갈라지면 한쪽이 막는 것을 다른 쪽이 보지 못하고, 그 틈이
+# 아무 신호도 내지 않습니다. 프로젝트 고유 추가분도 그 파일에 적습니다.
 
 # ---------------------------------------------------------------------------
 
@@ -54,8 +15,20 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 HARNESS_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 COMMON_LIB="${HARNESS_DIR}/scripts/lib/common.sh"
 DETECT_LIB="${HARNESS_DIR}/scripts/lib/detect-stack.sh"
+GUARD_LIB="${SCRIPT_DIR}/lib/guard-lib.sh"
 
 emit() { printf '%s\n' "$*" >&2; }
+
+# 공용 판정 자산입니다. 없으면 보호 목록도 일치 규칙도 없어 가드가 성립하지 않습니다.
+# 그 상태를 조용히 통과시키지 않고 사실을 알린 뒤 넘깁니다. 여기서 차단하면 파일 하나가
+# 사라진 것만으로 모든 편집이 막혀 복구조차 못 하게 됩니다.
+if [[ -f "${GUARD_LIB}" ]]; then
+  # shellcheck source=lib/guard-lib.sh
+  source "${GUARD_LIB}"
+else
+  emit "[harness] 경고: ${GUARD_LIB} 가 없어 보호 목록을 만들지 못했습니다. 이 호출은 아무것도 막지 않습니다."
+  exit 0
+fi
 
 usage() {
   cat <<'USAGE'
@@ -242,57 +215,9 @@ json_field() {
   printf '%s' "${value}"
 }
 
-# to_relative <project_root> <path>
-# Windows 절대 경로는 역슬래시로 들어옵니다. 정규화하지 않으면 '/' 를 포함한 패턴이 전부 빗나갑니다.
-to_relative() {
-  local root="$1" path="$2" lroot lpath
-  root="${root//\\//}"
-  path="${path//\\//}"
-  root="${root%/}"
-  path="${path#./}"
-  if [[ "${path}" == "${root}/"* ]]; then
-    printf '%s' "${path#"${root}/"}"
-    return 0
-  fi
-  # Windows 는 드라이브 문자 대소문자가 다를 수 있습니다. hook 은 매 편집마다 도므로 내장만 씁니다.
-  lroot="${root,,}"
-  lpath="${path,,}"
-  if [[ "${lpath}" == "${lroot}/"* ]]; then
-    printf '%s' "${path:$((${#root} + 1))}"
-    return 0
-  fi
-  printf '%s' "${path}"
-}
-
-# matches_any <rel> <base> <pattern...>
-matches_any() {
-  local rel="$1" base="$2" pat=""
-  shift 2
-  for pat in "$@"; do
-    # shellcheck disable=SC2053
-    if [[ "${rel}" == ${pat} ]]; then
-      printf '%s' "${pat}"
-      return 0
-    fi
-    if [[ "${pat}" == */* ]]; then
-      # 경로를 포함한 패턴은 하위 경로에서도 일치시킵니다.
-      # 이것이 없으면 하네스를 tools/harness/ 로 벤더링했을 때 가드가 자기 자신을 지키지 못하고,
-      # monorepo 하위 패키지의 평가 설정도 빗나갑니다.
-      # shellcheck disable=SC2053
-      if [[ "${rel}" == */${pat} ]]; then
-        printf '%s' "${pat}"
-        return 0
-      fi
-    else
-      # shellcheck disable=SC2053
-      if [[ "${base}" == ${pat} ]]; then
-        printf '%s' "${pat}"
-        return 0
-      fi
-    fi
-  done
-  return 1
-}
+# to_relative 와 matches_any 는 hooks/lib/guard-lib.sh 에 있습니다.
+# 여기에 복제본을 두지 마십시오. 갈라진 복제본이 verify 를 통과하는 문제는
+# improvement-log/2026-09-05-002 가 기록한 유형입니다.
 
 PAYLOAD="$(read_stdin_payload)"
 FILE_PATH="$(json_field "${PAYLOAD}" '.tool_input.file_path' 'file_path')"
@@ -322,6 +247,18 @@ if [[ -z "${FILE_PATH}" && -n "${SHELL_COMMAND}" ]]; then
     if printf '%s' "${SHELL_COMMAND}" | grep -qE '\bsed\b[^|;]*[[:space:]]-i|\bperl\b[^|;]*[[:space:]]-[a-z]*i'; then
       printf '%s' "${SHELL_COMMAND}" | tr '[:space:]' '\n' | grep -E '[./]' || true
     fi
+    # 같은 일을 다른 이름으로 하는 명령들. cp 로 보호 파일을 덮어쓰는 경로가 실제로
+    # 열려 있었고, 한 세션에서 10건이 그렇게 통과했습니다. 대상이 인자 어디에 오는지
+    # 형태가 제각각이라 제자리 편집과 같은 방식으로 경로 같은 토큰을 전부 봅니다.
+    # 보호 파일을 읽어서 다른 곳으로 복사하는 경우까지 걸리지만, 근거 없이 여는
+    # 것보다 닫는 쪽이 맞습니다.
+    #
+    # 이 목록은 닫히지 않습니다. python -c, node -e, make, 임의 스크립트는 여전히
+    # 통과합니다. 열거로 닫으려 하지 마십시오. 남는 경로는 사후 검출
+    # (detect-guarded-change.sh)과 CI(.github/workflows/harness.yml)가 담당합니다.
+    if printf '%s' "${SHELL_COMMAND}" | grep -qE '\b(cp|mv|install|truncate|dd|rsync|ln)\b'; then
+      printf '%s' "${SHELL_COMMAND}" | tr '[:space:]' '\n' | grep -E '[./]' || true
+    fi
   )"
   _hit=""
   while IFS= read -r _tok; do
@@ -335,9 +272,11 @@ if [[ -z "${FILE_PATH}" && -n "${SHELL_COMMAND}" ]]; then
   done <<< "${_targets}"
   if [[ -n "${_hit}" ]]; then
     if [[ "${HARNESS_ALLOW_GUARDED_EDIT:-}" == "1" ]]; then
+      guard_log_event "${PROJECT_ROOT}" bypass "${_hit%%|*}" "셸 명령, 패턴 ${_hit##*|}, HARNESS_ALLOW_GUARDED_EDIT=1"
       emit "[harness] HARNESS_ALLOW_GUARDED_EDIT=1 로 보호 파일을 건드리는 셸 명령을 허용했습니다: ${_hit%%|*}"
       exit 0
     fi
+    guard_log_event "${PROJECT_ROOT}" block "${_hit%%|*}" "셸 명령, 패턴 ${_hit##*|}"
     emit "[harness] 셸 명령을 차단했습니다: 보호 대상 ${_hit%%|*} 을(를) 변경하려 합니다 (패턴 ${_hit##*|})."
     emit "명령: ${SHELL_COMMAND}"
     emit "평가·게이트 파일을 셸로 우회해 고치는 것은 Edit 로 고치는 것과 같습니다."
@@ -358,10 +297,12 @@ BASE_NAME="${REL_PATH##*/}"
 MATCHED=""
 if MATCHED="$(matches_any "${REL_PATH}" "${BASE_NAME}" ${HARNESS_PROTECTED_PATTERNS[@]+"${HARNESS_PROTECTED_PATTERNS[@]}"})"; then
   if [[ "${HARNESS_ALLOW_GUARDED_EDIT:-}" == "1" ]]; then
+    guard_log_event "${PROJECT_ROOT}" bypass "${REL_PATH}" "파일 편집, 패턴 ${MATCHED}, HARNESS_ALLOW_GUARDED_EDIT=1"
     emit "[harness] HARNESS_ALLOW_GUARDED_EDIT=1 로 보호 파일 변경을 허용했습니다: ${REL_PATH} (패턴 ${MATCHED})"
     emit "이 변경은 사람 승인 또는 harness-promote 절차의 기록으로 남겨야 합니다."
     exit 0
   fi
+  guard_log_event "${PROJECT_ROOT}" block "${REL_PATH}" "파일 편집, 패턴 ${MATCHED}"
   emit "[harness] 변경을 차단했습니다: ${REL_PATH}"
   emit "이 경로는 평가·게이트를 규정하는 보호 대상입니다(일치 패턴: ${MATCHED})."
   emit "평가 기준을 스스로 고쳐 통과시키는 것은 개선이 아니라 평가 조작입니다."
@@ -374,6 +315,7 @@ if MATCHED="$(matches_any "${REL_PATH}" "${BASE_NAME}" ${HARNESS_PROTECTED_PATTE
 fi
 
 if MATCHED="$(matches_any "${REL_PATH}" "${BASE_NAME}" ${HARNESS_WARN_PATTERNS[@]+"${HARNESS_WARN_PATTERNS[@]}"})"; then
+  guard_log_event "${PROJECT_ROOT}" warn "${REL_PATH}" "패턴 ${MATCHED}"
   emit "[harness] 경고: ${REL_PATH} 는 평가 결과에 영향을 줄 수 있는 파일입니다(일치 패턴: ${MATCHED})."
   emit "검증 명령, 임계값, 테스트 범위를 약화시키는 변경인지 확인하고, 그렇다면 되돌립니다."
   exit 0

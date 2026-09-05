@@ -97,7 +97,7 @@ Memory는 학습 그 자체가 아니라 **검증된 학습 결과를 보존하�
 ```
 
 - `score` 는 가중 평균을 반올림한 0~100 정수입니다. 위 예시의 계산은 `100×0.30 + 100×0.15 + 92×0.15 + 75×0.20 + 88×0.10 + 70×0.10 = 89.6` 이므로 `90` 입니다.
-- `pass` 는 `score >= threshold` 입니다. `pass` 가 `true` 여도 `largest_failure` 는 항상 채웁니다. 위 예시처럼 총점이 통과해도 `behavior` 가 열려 있을 수 있고, 그 사실이 보고에서 사라지면 안 됩니다.
+- `pass` 는 `score >= threshold` 이고 `failed_required` 가 0 일 때만 `true` 입니다. 필수 단계가 하나라도 실패하면 총점과 무관하게 `false` 입니다([../subagents/harness-evaluator.md](../subagents/harness-evaluator.md) EV-5). `pass` 가 `true` 여도 `largest_failure` 는 항상 채웁니다. 위 예시처럼 총점이 통과해도 `behavior` 가 열려 있을 수 있고, 그 사실이 보고에서 사라지면 안 됩니다.
 - `pass` 는 promote 허가가 아닙니다. 승격 판정은 `../rules/promotion-gate.rule.md` 가 소유하며, 그 게이트는 `pass` 외에 계층별 회귀 여부를 함께 봅니다.
 
 ## 6. 계층 가중치 조정 규칙

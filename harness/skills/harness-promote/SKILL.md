@@ -75,7 +75,11 @@ cp .harness/latest-eval.json .harness/baseline-eval.json
 
 ### 5. 대표 task 평가
 
-후보 하네스를 적용한 상태에서 대표 task 를 실행합니다. task 목록과 실행 방법은 [../../evaluation/tasks/representative.md](../../evaluation/tasks/representative.md) 를 따릅니다.
+이 단계의 근거는 **두 갈래**이고 서로 대체하지 않습니다. `eval.sh` 는 task 를 실행하지 않습니다.
+
+#### 5.1 하네스 무결성 회귀
+
+아래 명령이 답하는 질문은 "후보 하네스를 적용한 뒤에도 하네스 자신이 성립하는가" 하나입니다. 대표 task 의 합격 여부는 이 산출에 들어 있지 않습니다.
 
 ```bash
 harness/scripts/eval.sh
@@ -87,17 +91,25 @@ cat .harness/latest-eval.json
 | 항목 | 위치 |
 | --- | --- |
 | 총점 | `.harness/latest-eval.json` 의 `score` |
-| 임계값 통과 | `threshold`, `pass` |
+| 임계값 통과 | `threshold`, `pass`, `failed_required` |
 | 계층별 점수 | `layers[].layer` 와 `layers[].score` |
 | 가장 큰 실패 | `largest_failure` |
 
 계층별 점수는 `correctness`, `architecture`, `quality`, `behavior`, `performance`, `subjective` 여섯 개를 모두 적습니다. 총점만 기록하지 않습니다. 총점이 올라도 특정 계층이 내려갔다면 그것이 판정 근거입니다.
+
+#### 5.2 대표 task 실행
+
+task 목록은 [../../evaluation/tasks/representative.md](../../evaluation/tasks/representative.md) 입니다. 각 task 는 **하네스를 처음 만나는 새 세션**에서 실행하고, 결과를 task 한 건당 한 파일로 [../../evaluation/runs/](../../evaluation/runs/) 에 남깁니다. 형식은 [../../evaluation/runs/_template.md](../../evaluation/runs/_template.md) 입니다.
+
+실행하지 않은 task 는 `not-run` 으로 기록합니다. 5.1 의 점수로 대신하지 않습니다. 실행하지 않은 task 를 통과로 적는 것이 이 절차가 막으려는 실패입니다.
 
 ### 6. held-out task 평가
 
 대표 task 만으로는 과적합을 걸러내지 못합니다. candidate 작성 시점에 보지 않은 task 로 다시 평가합니다. 목록은 [../../evaluation/tasks/held-out.md](../../evaluation/tasks/held-out.md) 를 따릅니다.
 
 held-out task 를 candidate 에 맞춰 고르거나 수정하지 않습니다. held-out 을 조정하는 순간 이 게이트는 무효가 됩니다.
+
+대표 task 와 같은 방식으로 실행하고 결과를 [../../evaluation/runs/](../../evaluation/runs/) 에 남깁니다. held-out 은 승격 판정 시점에 1회만 실행합니다.
 
 임계값 통과 여부는 스크립트로 판정합니다.
 
@@ -119,6 +131,7 @@ harness/scripts/pass-threshold.sh
 | 회귀 발생 | `rejected`, 적용한 변경을 되돌립니다 |
 | 개선 근거 없음 | `rejected` 또는 `candidate` 로 되돌려 재설계 |
 | 보안 민감 영역 변경 | 사람 검토 전까지 `validating` 유지 |
+| 대표 또는 held-out task 에 `not-run` 이 남아 있음 | `validating` 유지. PG-3 미충족이며 `eval.sh` 점수로 대신하지 않습니다 |
 
 기각한 변경은 반드시 되돌립니다. "점수는 안 올랐지만 나쁘지 않으니 남긴다"는 판정을 하지 않습니다. 그 축적이 Self-Drift 입니다.
 
@@ -136,6 +149,7 @@ harness/scripts/pass-threshold.sh
 baseline score 72 (correctness 80 / architecture 60 / quality 75 / behavior 70 / performance 70 / subjective 70)
 representative 81 (correctness 85 / architecture 95 / quality 75 / behavior 72 / performance 70 / subjective 72)
 held-out 79 (회귀 없음)
+task 실행 기록: evaluation/runs/2026-08-09-REP-1.md pass, evaluation/runs/2026-08-09-HLD-2.md pass
 판정: promoted
 ```
 

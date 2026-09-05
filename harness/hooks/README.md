@@ -11,6 +11,8 @@
 | `settings.hooks.json` | Claude Code `settings.json` 의 `hooks` 블록에 병합할 JSON 조각 |
 | `stop-verify-gate.sh` | Stop hook. 검증 없이 작업을 끝내는 것을 차단 |
 | `guard-evaluation-tampering.sh` | PreToolUse hook. 평가·게이트 규정 파일의 변경을 차단 |
+| `detect-guarded-change.sh` | PostToolUse hook. 보호 파일이 실제로 바뀌었는지 사후에 검출 |
+| `lib/guard-lib.sh` | 두 hook 이 공유하는 보호·경고 패턴, 경로 판정, 감사 기록. source 전용 |
 | `../language/<언어>/lang.sh` | 언어별 차단·경고 패턴. guard hook 이 로드된 **모든** 팩의 것을 감지 결과와 무관하게 코어 목록에 합칩니다 (아래 "보호 목록" 절) |
 
 ## 각 hook 이 강제하는 것
@@ -79,6 +81,12 @@ sed -i 's/THRESHOLD=90/THRESHOLD=0/' harness.config  # 합격선 무력화
 
 그래서 `Bash` 도구도 matcher 에 등록하고 `tool_input.command` 를 봅니다. 읽기는 막지 않습니다. `cat`, `grep`, `git diff` 로 보호 파일을 보는 것은 정상 작업입니다. **변경 구문이 실제로 겨냥하는 대상**만 뽑아 대조합니다.
 
+보는 구문은 리다이렉션, `tee`, 제자리 편집, 그리고 복사·이동 계열(`cp`, `mv`, `install`, `truncate`, `dd`, `rsync`, `ln`)입니다. 마지막 묶음은 실제로 뚫린 뒤에 더했습니다. 한 세션에서 `cp` 로 보호 파일 10건이 차단 없이 덮어써졌습니다.
+
+**이 목록은 닫히지 않습니다.** `python -c`, `node -e`, `make`, 임의 스크립트는 여전히 통과합니다. `cp` 를 막으면 `mv` 가, `mv` 를 막으면 인터프리터가 남습니다. `bash` 를 허용하는 순간 전부 허용한 것입니다. 열거를 늘려 닫으려 하지 마십시오. 남는 경로는 사후 검출과 CI 가 담당합니다. 여기서 하는 일은 **가장 손쉬운 지름길을 막고 판단 지점을 만드는 것**까지입니다.
+
+반대 방향의 오탐도 남습니다. 이 검사는 명령 문자열을 봅니다. heredoc 본문이나 인용부호 안에 보호 경로가 등장하기만 해도 걸릴 수 있습니다. 실제로 이 문단을 쓰는 명령이 그 이유로 두 번 차단되었습니다. 근거: improvement-log/2026-09-05-004.
+
 | 검사하는 대상 | 예 |
 | --- | --- |
 | 리다이렉션 대상 | `> 파일`, `>> 파일` (`2>&1` 은 대상이 `&1` 이라 걸리지 않습니다) |
@@ -97,7 +105,7 @@ sed -i 's/THRESHOLD=90/THRESHOLD=0/' harness.config  # 합격선 무력화
 
 | 층 | 위치 | 담는 것 |
 | --- | --- | --- |
-| 코어 | 스크립트 상단의 `HARNESS_PROTECTED_PATTERNS`, `HARNESS_WARN_PATTERNS` | `harness.config`, `harness/evaluation/*`, `harness/rules/*`, `harness/language/*/lang.sh` 처럼 언어와 무관한 하네스 자체의 파일. 프로젝트 고유 추가분도 여기 적습니다 |
+| 코어 | [`lib/guard-lib.sh`](lib/guard-lib.sh) 의 `HARNESS_PROTECTED_PATTERNS`, `HARNESS_WARN_PATTERNS` | `harness.config`, `harness/evaluation/*`, `harness/rules/*`, `harness/language/*/lang.sh` 처럼 언어와 무관한 하네스 자체의 파일. 프로젝트 고유 추가분도 여기 적습니다 |
 | 언어 팩 | `harness/language/<언어>/lang.sh` 의 `HARNESS_LANG_<언어>_PROTECTED_PATTERNS` 등 | lint·타입·테스트 러너·아키텍처 규칙 설정처럼 언어에 종속된 파일 |
 
 **보호 목록은 스택 감지 결과에 의존하지 않습니다.** hook 은 로드된 **모든** 팩의 패턴(공통 + 모든 kind)을 코어 목록에 합칩니다. Java 저장소에서도 `tsconfig.json` 이 차단되고, 스택을 감지하지 못한 저장소에서도 `checkstyle.xml` 과 `ruff.toml` 이 차단됩니다.
@@ -242,13 +250,58 @@ Stop hook 이 종료를 막으면 에이전트는 작업을 계속하다가 다�
 
 `guard-evaluation-tampering.sh` 는 상태를 바꾸지 않고 판정만 하므로 재진입 문제가 없습니다.
 
+### detect-guarded-change.sh
+
+사전 차단은 명령 문자열을 보고 "바꿀 것 같은가" 를 **추정**합니다. 그 추정은 두 방향으로 틀립니다.
+
+| 방향 | 예 |
+| --- | --- |
+| 미탐 | `cp new old`, `mv`, `python -c`, `make`, 임의 스크립트. 열거로는 닫히지 않습니다 |
+| 오탐 | 인용부호 안에 보호 경로를 언급한 명령, heredoc 본문의 코드 |
+
+`bash` 를 허용하는 순간 전부 허용한 것이고, 쓰기가 hook 이 읽을 수 없는 프로그램 안에서 일어날 수도 있습니다. 그래서 **추정을 보완하는 관측**을 둡니다. 이 hook 은 도구 호출이 끝난 뒤 보호 파일의 내용 해시를 `.harness/guard-snapshot.tsv` 와 비교합니다. 무엇이 바꿨는지와 무관하게 바뀐 사실이 드러나므로 미탐이 없고, 명령을 파싱하지 않으므로 오탐도 없습니다.
+
+대신 **막지 못합니다.** PostToolUse 는 이미 일어난 일을 되돌리지 못하므로 exit 0 만 씁니다. 사전 차단과 사후 검출은 대체 관계가 아니라 짝입니다. 하나는 강제력이 있고 관측이 새며, 다른 하나는 관측이 완전하고 강제력이 없습니다.
+
+| 항목 | 값 |
+| --- | --- |
+| 감시 대상 | 코어 보호 패턴 + 로드된 모든 언어 팩 패턴. `.harness/*` 는 스크립트가 매 실행 다시 쓰므로 제외 |
+| 스냅숏 | `.harness/guard-snapshot.tsv`. 없으면 만들고 아무것도 보고하지 않습니다 |
+| 기록 | `.harness/guard-events.log` |
+| 비용 | 이 저장소에서 감시 39개, 정상 상태 0.72초. 팩 병합 결과는 `.harness/guard-patterns.cache` 에 캐시하고 `lang.sh` 가 더 새로울 때만 다시 만듭니다 |
+| 확인 | `harness/hooks/detect-guarded-change.sh --status` |
+
+git 저장소가 아니면 아무것도 하지 않습니다. 해시를 비교할 기준이 없기 때문입니다.
+
+### 감사 기록
+
+`.harness/guard-events.log` 는 탭 구분이며 `시각 / HEAD / 종류 / 경로 / 상세` 다섯 열입니다. 종류는 `block`, `bypass`, `warn`, `change` 입니다.
+
+이것이 없으면 `HARNESS_ALLOW_GUARDED_EDIT=1` 우회가 stderr 한 줄로 사라지고, 대표 task REP-3 의 합격 기준인 "guard hook 이 차단 메시지를 낸 흔적이 없음" 을 관측할 수단이 없습니다. 기록은 승인을 막지 않습니다. 승인이 있었다는 사실을 남길 뿐입니다.
+
+로그는 런타임 산출물이라 커밋하지 않습니다. 세션을 넘어 남는 근거가 필요하면 CI 가 담당합니다.
+
+## 이 hook 들이 보장하지 않는 것
+
+로컬 hook 은 **에이전트가 도는 곳에서** 돕니다. 그래서 결정적인 우회는 원리적으로 막지 못합니다.
+
+- 명령 열거는 닫히지 않습니다. `cp` 를 막으면 `mv` 가, `mv` 를 막으면 `python -c` 가 남습니다.
+- 쓰기가 hook 이 읽을 수 없는 프로그램 안에서 일어날 수 있습니다.
+- hook 을 등록하는 파일을 고치면 hook 자체가 사라집니다.
+- `HARNESS_ALLOW_GUARDED_EDIT=1` 은 정당한 작업을 위해 반드시 있어야 하는 탈출구입니다.
+
+여기서 막으려는 것은 악의적 사람이 아니라 **게이트를 통과시키려는 압력을 받는 에이전트**입니다. 그 상대는 회피에 끈질기지 않고 숨기지도 않습니다. 처음 통하는 경로를 즉시 쓸 뿐입니다. 그래서 차단과 검출의 조합이 실제로 효과가 있습니다. 설계 목표는 "속일 의도가 없는 에이전트는 실수로도 속이지 못하고, 속인 에이전트는 흔적을 남긴다" 입니다.
+
+**무결성 보장은 저장소 밖에 있어야 합니다.** 에이전트는 자기 머신의 어떤 hook 도 이길 수 있지만 다른 곳에서 도는 검사는 이기지 못합니다. `.github/workflows/harness.yml` 이 그 역할을 합니다.
+
 ## 비활성화 방법과 그 위험
 
 | 방법 | 범위 | 위험 |
 | --- | --- | --- |
 | `settings.json` 의 해당 항목 제거 | 영구 | 하네스가 규칙 문서만 남고 강제력을 잃습니다 |
 | `HARNESS_SKIP_STOP_GATE=1` | 해당 실행 1회 | 검증되지 않은 결과가 완료로 보고됩니다 |
-| `HARNESS_ALLOW_GUARDED_EDIT=1` | 해당 실행 1회 | 평가 기준이 검토 없이 바뀔 수 있습니다 |
+| `HARNESS_ALLOW_GUARDED_EDIT=1` | 해당 실행 1회 | 평가 기준이 검토 없이 바뀔 수 있습니다. `.harness/guard-events.log` 에 `bypass` 로 남습니다 |
+| `HARNESS_DETECT_SKIP_PACKS=1` | 해당 실행 1회 | 사후 검출의 감시 범위가 코어 패턴으로 좁아집니다 |
 | 보호 배열에서 패턴 삭제 | 영구 | 삭제한 경로는 다시 조작 가능한 상태가 됩니다 |
 | 언어 팩 `lang.sh` 에서 패턴 삭제 | 영구 | 그 언어의 lint·타입·테스트 설정이 다시 조작 가능한 상태가 됩니다. `lang.sh` 자체가 코어 차단 목록에 있으므로 에이전트는 편집 도구로 우회할 수 없습니다 |
 | `language/` 디렉터리 삭제 또는 `lang.sh` 파손 | 영구 | 언어별 보호가 전부 사라집니다. hook 이 매 호출마다 stderr 로 알리므로 조용히 진행되지는 않습니다 |
