@@ -1,0 +1,16 @@
+# improvement log 후보입니다. improvement-log/schema.md 의 키 순서를 바꾸지 않습니다.
+id: 2026-09-05-001
+date: 2026-09-05
+status: candidate
+symptom: 문서 산문과 구현이 갈린 것이 코드 리뷰 전까지 아무 신호도 내지 않았습니다. hooks/README.md 14행이 48행 및 구현과 반대로 서술했고(감지 의존 보호 — improvement-log/2026-09-03-001 이 회귀로 닫은 설계), java/lang.sh 71행 주석이 통합 테스트를 실행한다고 적었으나 -DskipTests 가 failsafe 를 껐으며, 스크립트 14곳이 존재하지 않는 '사양 6.1~6.7' 을 인용했고, harness.config 가 정본이라 선언한 harness.config.example 에 실제로 쓰는 키가 없었습니다.
+evidence: "코드 리뷰 15건 중 4건이 이 유형. grep -rn '사양 6\.' --include=*.sh harness/ 가 14건, hooks/README.md:14 vs :48, harness/language/java/lang.sh:71, harness/scripts/harness.config.example 에 HARNESS_SELF_CHECK_LINK_DIRS 0건. 커밋 e146cf2, 76a872a, 6cfe582 에서 각각 수정."
+root_cause: 문서-코드 일치를 기계로 판정하는 수단이 self-check 의 links 검사 하나뿐이고, 그것은 마크다운 링크의 대상 파일 존재만 봅니다. 산문 속 문서 참조(사양 6.5, 정본 선언), 표의 서술과 구현의 불일치, 주석과 명령의 불일치는 어느 검사에도 걸리지 않습니다. 그래서 EL-1 수준으로만 강제되고 있었습니다.
+fix: "네 건 모두 개별 수정했습니다. 유형 자체를 막는 수단은 아직 없습니다. 후보: (1) 스크립트 주석·문자열이 가리키는 문서 경로가 실재하는지 검사하는 self-check 항목 추가, (2) 팩이 내는 명령과 팩 README 표를 대조하는 검사, (3) 정본 선언(X 가 정본입니다)이 가리키는 파일에 해당 키가 있는지 검사."
+recurrence_risk: high
+harness_element: HE-3
+proposed_harness_change: self-check 에 doc-refs 항목을 더해, 번들의 .sh 주석·출력 문자열에 등장하는 저장소 상대 경로가 실재하는지 검사합니다. links 검사가 마크다운에 대해 하는 일을 스크립트 산문에 대해 하는 것입니다.
+preferred_enforcement: test
+trust: untrusted
+regression_check: REP 과제에서 스크립트 주석에 없는 경로를 넣으면 verify 가 실패하는지, 정상 상태에서 통과하는지 확인합니다. 오탐(코드 조각, 예시 경로)을 억제할 방법이 없으면 도입하지 않습니다.
+owner: unassigned
+expires: 2026-12-31
