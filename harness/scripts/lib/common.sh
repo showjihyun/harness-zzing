@@ -16,7 +16,7 @@ HARNESS_DIR="$(cd "${HARNESS_SCRIPTS_DIR}/.." && pwd -P)"
 HARNESS_PARENT_DIR="$(cd "${HARNESS_DIR}/.." && pwd -P)"
 export HARNESS_LIB_DIR HARNESS_SCRIPTS_DIR HARNESS_DIR HARNESS_PARENT_DIR
 
-# 런타임 산출 경로 (사양 6.1). 프로젝트 루트 기준 상대 경로입니다.
+# 런타임 산출 경로 (정본: README.md 의 "런타임 산출 경로"). 프로젝트 루트 기준 상대 경로입니다.
 HARNESS_STATE_DIR=".harness"
 HARNESS_LOG_DIR=".harness/logs"
 HARNESS_VERIFY_JSON=".harness/verify.json"
@@ -24,7 +24,7 @@ HARNESS_EVAL_JSON=".harness/latest-eval.json"
 HARNESS_LOOP_JSON=".harness/loop-state.json"
 HARNESS_IMPROVEMENT_DIR="improvement-log"
 
-# 평가 계층 (사양 6.2, 6종 고정)
+# 평가 계층 (6종 고정. 정본: references/evaluation-layers.md)
 HARNESS_LAYERS=(correctness architecture quality behavior performance subjective)
 
 # --- 색상 --------------------------------------------------------------------

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # loop.sh — 예산과 종료 조건을 가진 self-improving loop 러너입니다.
-# 사양 6.7 의 종료 조건을 모두 구현하고 상태를 .harness/loop-state.json 에 남깁니다.
+# rules/loop-budget.rule.md 의 종료 조건을 모두 구현하고 상태를 .harness/loop-state.json 에 남깁니다.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -26,7 +26,7 @@ usage() {
   --dry-run             에이전트를 실행하지 않고 사람이 실행할 프롬프트만 출력합니다.
   -h, --help            이 도움말을 출력합니다.
 
-종료 조건 (사양 6.7):
+종료 조건 (rules/loop-budget.rule.md):
   - 최대 반복 횟수 도달                      → max_iterations
   - 동일 실패 서명 HARNESS_MAX_SAME_FAILURE 회 → same_failure
   - HARNESS_NO_IMPROVEMENT_ROUNDS 라운드 연속 개선 없음 → no_improvement
@@ -292,7 +292,7 @@ while :; do
 
   write_state
 
-  # --- 종료 조건 (사양 6.7) ---
+  # --- 종료 조건 (rules/loop-budget.rule.md) ---
   if security_sensitive_change; then
     STOPPED_REASON="security_review"
   elif [[ "$SAME_FAILURE_COUNT" -ge "$MAX_SAME_FAILURE" ]]; then

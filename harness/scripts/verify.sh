@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # verify.sh — 통합 검증 명령. 프로젝트의 모든 검증 단계를 한 번에 실행하고
-# 결과를 .harness/verify.json (사양 6.3) 으로 남깁니다.
+# 결과를 .harness/verify.json 으로 남깁니다. 키는 아래 write_verify_json 이 소유하고,
+# 게이트가 읽는 키의 의미는 hooks/README.md 가 설명합니다.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"

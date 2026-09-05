@@ -1,11 +1,21 @@
 #!/usr/bin/env bash
 # improvement-log.sh — improvement log 후보를 만들고 조회하고 검증하는 CLI 입니다.
-# 사양 6.5 의 키 목록과 순서, enum 값을 강제합니다.
+# improvement-log/schema.md 의 키 목록과 순서, enum 값을 강제합니다.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck disable=SC1090,SC1091
 source "${SCRIPT_DIR}/lib/common.sh"
+
+# _need_value <플래그> [값...] — 값이 따라오지 않으면 exit 3 으로 멈춥니다.
+#
+# shift 2 를 무조건 하면 인자가 하나뿐일 때 set -e 가 스크립트를 조용히
+# 종료시킵니다. 호출자는 출력 없는 exit 1 만 보고, usage 는 1 을 "검증 위반
+# 또는 허용되지 않은 전이" 로 문서화하므로 인자 실수가 스키마 위반으로
+# 오독됩니다. 인자 오류의 규약 코드는 3 입니다.
+_need_value() {
+  [[ $# -ge 2 ]] || die "${1} 에는 값이 필요합니다." 3
+}
 
 usage() {
   cat <<'USAGE'
@@ -158,19 +168,19 @@ cmd_new() {
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --symptom) symptom="${2:-}"; shift 2 ;;
-      --evidence) evidence="${2:-}"; shift 2 ;;
-      --root-cause) root_cause="${2:-}"; shift 2 ;;
-      --fix) fix="${2:-}"; shift 2 ;;
-      --recurrence-risk) recurrence_risk="${2:-}"; shift 2 ;;
-      --harness-element) harness_element="${2:-}"; shift 2 ;;
-      --proposed-harness-change) proposed="${2:-}"; shift 2 ;;
-      --preferred-enforcement) enforcement="${2:-}"; shift 2 ;;
-      --trust) trust="${2:-}"; shift 2 ;;
-      --regression-check) regression_check="${2:-}"; shift 2 ;;
-      --owner) owner="${2:-}"; shift 2 ;;
-      --expires) expires="${2:-}"; shift 2 ;;
-      --status) status="${2:-}"; shift 2 ;;
+      --symptom) _need_value "$@"; symptom="$2"; shift 2 ;;
+      --evidence) _need_value "$@"; evidence="$2"; shift 2 ;;
+      --root-cause) _need_value "$@"; root_cause="$2"; shift 2 ;;
+      --fix) _need_value "$@"; fix="$2"; shift 2 ;;
+      --recurrence-risk) _need_value "$@"; recurrence_risk="$2"; shift 2 ;;
+      --harness-element) _need_value "$@"; harness_element="$2"; shift 2 ;;
+      --proposed-harness-change) _need_value "$@"; proposed="$2"; shift 2 ;;
+      --preferred-enforcement) _need_value "$@"; enforcement="$2"; shift 2 ;;
+      --trust) _need_value "$@"; trust="$2"; shift 2 ;;
+      --regression-check) _need_value "$@"; regression_check="$2"; shift 2 ;;
+      --owner) _need_value "$@"; owner="$2"; shift 2 ;;
+      --expires) _need_value "$@"; expires="$2"; shift 2 ;;
+      --status) _need_value "$@"; status="$2"; shift 2 ;;
       -h|--help) usage; exit 0 ;;
       *) die "new 가 모르는 옵션입니다: $1" 3 ;;
     esac
@@ -194,7 +204,7 @@ cmd_new() {
   [[ -e "$file" ]] && die "이미 존재하는 파일입니다: ${file}" 2
 
   {
-    printf '# improvement log 후보입니다. 사양 6.5 의 키 순서를 바꾸지 않습니다.\n'
+    printf '# improvement log 후보입니다. improvement-log/schema.md 의 키 순서를 바꾸지 않습니다.\n'
     printf 'id: %s\n' "$id"
     printf 'date: %s\n' "$today"
     printf 'status: %s\n' "$(il_yaml_value "$status")"
@@ -222,7 +232,7 @@ cmd_list() {
   local filter=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --status) filter="${2:-}"; shift 2 ;;
+      --status) _need_value "$@"; filter="$2"; shift 2 ;;
       --status=*) filter="${1#*=}"; shift ;;
       -h|--help) usage; exit 0 ;;
       *) die "list 가 모르는 옵션입니다: $1" 3 ;;
@@ -272,12 +282,12 @@ validate_one() {
       printf '%s:%s 필수 키가 없습니다.\n' "$rel" "$expected"
       violations=$((violations + 1))
     elif [[ "$actual" != "$expected" ]]; then
-      printf '%s:%s 키 순서가 사양 6.5 와 다릅니다. %s번째는 %s 여야 합니다.\n' "$rel" "$actual" "$((i + 1))" "$expected"
+      printf '%s:%s 키 순서가 improvement-log/schema.md 와 다릅니다. %s번째는 %s 여야 합니다.\n' "$rel" "$actual" "$((i + 1))" "$expected"
       violations=$((violations + 1))
     fi
   done
   for ((i = ${#REQUIRED_KEYS[@]}; i < ${#keys[@]}; i++)); do
-    printf '%s:%s 사양 6.5 에 없는 키입니다.\n' "$rel" "${keys[$i]}"
+    printf '%s:%s improvement-log/schema.md 에 없는 키입니다.\n' "$rel" "${keys[$i]}"
     violations=$((violations + 1))
   done
 
@@ -360,7 +370,7 @@ cmd_validate() {
     printf '%s\n' "검증 실패: ${bad}개 파일에 위반이 있습니다."
     return 1
   fi
-  printf '%s\n' "검증 통과: ${#files[@]}개 파일이 사양 6.5 를 만족합니다."
+  printf '%s\n' "검증 통과: ${#files[@]}개 파일이 improvement-log/schema.md 를 만족합니다."
   return 0
 }
 

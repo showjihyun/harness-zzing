@@ -9,7 +9,7 @@
 #   detect_all_stacks [root]  감지 순서대로 모든 후보 스택 ID (한 줄에 하나).
 #   detect_kind <root> [stack]  frontend | backend | fullstack | unknown. HARNESS_KIND 가 있으면 그 값.
 #   stack_base / stack_variant   "typescript:pnpm" → "typescript" / "pnpm".
-#   default_steps_for_stack <stack> [root] [kind]   "id|layer|required|command" 줄 목록 (사양 6.6).
+#   default_steps_for_stack <stack> [root] [kind]   "id|layer|required|command" 줄 목록 (language/README.md 2절).
 #   lang_all_protected_patterns / lang_all_warn_patterns / lang_all_security_patterns
 #                             로드된 **모든** 팩 × 모든 kind 의 패턴 합집합. 보호 판정은 이것만 씁니다.
 #                             감지 결과로 범위를 좁히는 변형을 다시 만들지 마십시오. 근거는 hooks/README.md 입니다.
@@ -229,7 +229,7 @@ detect_kind() {
 }
 
 # default_steps_for_stack <stack> [root] [kind]
-# 출력: "id|layer|required|command" 형식의 줄 목록 (사양 6.6). 팩이 없으면 아무 줄도 출력하지 않습니다.
+# 출력: "id|layer|required|command" 형식의 줄 목록 (language/README.md 2절). 팩이 없으면 아무 줄도 출력하지 않습니다.
 default_steps_for_stack() {
   local stack="${1:-unknown}" root="${2:-$PWD}" kind="${3:-}" base
   base="$(stack_base "$stack")"

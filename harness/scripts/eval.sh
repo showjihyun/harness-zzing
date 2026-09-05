@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # eval.sh — verify 결과를 6개 평가 계층으로 집계해 가중 점수를 냅니다.
-# 결과는 .harness/latest-eval.json (사양 6.4) 에 기록합니다.
+# 결과는 .harness/latest-eval.json 에 기록합니다. 키와 산출식의 정본은 evaluation/rubric.md 입니다.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"

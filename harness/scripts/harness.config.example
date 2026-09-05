@@ -116,8 +116,18 @@ HARNESS_AGENT_CMD=""
 #   기본값: "typescript java python go rust"
 # HARNESS_PROJECT_ROOT — 프로젝트 루트 탐색을 강제로 재정의합니다.
 #   영향을 받는 스크립트: 모든 스크립트 (lib/common.sh 의 find_project_root)
+# HARNESS_SELF_CHECK_LINK_DIRS — self-check 의 links 검사에 프로젝트 문서를 더합니다.
+#   기본값은 번들(harness/)뿐입니다. 채택하지 않은 프로젝트의 문서를 임의로 훑으면
+#   의도적인 외부 링크까지 실패로 잡히기 때문입니다.
+#   진입점 문서(README, AGENTS.md, CLAUDE.md)와 평가 세트는 링크가 끊기면
+#   에이전트의 탐색 경로가 사라지므로 여기에 등록해 두는 것을 권합니다.
+#   값은 **프로젝트 루트 기준 상대 경로**를 공백으로 나열합니다. 파일도 디렉터리도 됩니다.
+#   주의: 존재하지 않는 경로를 적으면 links 단계가 실패합니다(설정 오류로 봅니다).
+#   그러므로 이 예시 값을 그대로 복사하지 말고 실제로 있는 문서만 적으십시오.
+#   영향을 받는 스크립트: scripts/self-check.sh (verify 의 links 단계)
 #
 # HARNESS_MAX_SECONDS=1800
+# HARNESS_SELF_CHECK_LINK_DIRS="README.md AGENTS.md docs"
 # HARNESS_STACK="typescript:pnpm"
 # HARNESS_KIND="frontend"
 # HARNESS_LANG_DETECT_ORDER="java typescript"
