@@ -43,7 +43,7 @@ fi
 fallback_find_project_root() {
   local dir="${1:-${PWD}}"
   while [[ "${dir}" != "/" && -n "${dir}" ]]; do
-    if [[ -d "${dir}/.git" || -f "${dir}/harness.config" || -d "${dir}/harness" ]]; then
+    if [[ -e "${dir}/.git" || -f "${dir}/harness.config" || -d "${dir}/harness" ]]; then
       printf '%s\n' "${dir}"
       return 0
     fi
@@ -134,8 +134,10 @@ json_raw() {
 }
 
 # 작업 트리 지문. lib/common.sh 가 있으면 그쪽 정본을 씁니다.
+# common.sh 의 harness_tree_fingerprint 와 **같은 입력**을 해시해야 합니다.
+# 다르면 verify 가 기록한 지문과 게이트가 계산한 지문이 영원히 어긋나 모든 종료가 막힙니다.
 fallback_tree_fingerprint() {
-  local root="${1:-$PWD}" hasher="" h=""
+  local root="${1:-$PWD}" hasher="" h="" f=""
   git -C "${root}" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
   for h in sha1sum shasum md5sum cksum; do
     if command -v "${h}" >/dev/null 2>&1; then hasher="${h}"; break; fi
@@ -144,6 +146,11 @@ fallback_tree_fingerprint() {
   {
     git -C "${root}" rev-parse HEAD 2>/dev/null || printf 'no-head\n'
     git -C "${root}" status --porcelain 2>/dev/null || true
+    git -C "${root}" diff HEAD 2>/dev/null || true
+    while IFS= read -r -d '' f; do
+      printf '%s ' "${f}"
+      git -C "${root}" hash-object -- "${root}/${f}" 2>/dev/null || printf 'unhashable\n'
+    done < <(git -C "${root}" ls-files -o --exclude-standard -z 2>/dev/null)
   } | "${hasher}" | awk '{print $1}'
 }
 

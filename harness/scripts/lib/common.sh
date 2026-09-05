@@ -138,7 +138,7 @@ now_iso() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 # git 저장소가 아니거나 해시 도구가 없으면 빈 문자열을 냅니다. 그 환경에서는
 # 신선도를 판정하지 않습니다(판정할 근거가 없는 것을 통과로도 실패로도 쓰지 않습니다).
 harness_tree_fingerprint() {
-  local root="${1:-$PWD}" hasher="" h=""
+  local root="${1:-$PWD}" hasher="" h="" f=""
   git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
   for h in sha1sum shasum md5sum cksum; do
     if command -v "$h" >/dev/null 2>&1; then hasher="$h"; break; fi
@@ -146,7 +146,18 @@ harness_tree_fingerprint() {
   [[ -n "$hasher" ]] || return 0
   {
     git -C "$root" rev-parse HEAD 2>/dev/null || printf 'no-head\n'
+    # 경로와 상태 문자만으로는 부족합니다. 이미 더티한 파일을 다시 고치면
+    # porcelain 출력이 " M path" 그대로여서 지문이 변하지 않고, 검증한 뒤 같은
+    # 파일을 또 고치고 종료하는 경우 — 이 게이트가 막으려던 바로 그 경우 —
+    # 를 놓칩니다. 그래서 **내용**을 함께 넣습니다.
     git -C "$root" status --porcelain 2>/dev/null || true
+    # 추적 파일의 실제 변경 내용 (스테이지된 것과 아닌 것 모두).
+    git -C "$root" diff HEAD 2>/dev/null || true
+    # 미추적 파일은 diff 에 안 나오므로 경로와 내용 해시를 따로 붙입니다.
+    while IFS= read -r -d '' f; do
+      printf '%s ' "$f"
+      git -C "$root" hash-object -- "$root/$f" 2>/dev/null || printf 'unhashable\n'
+    done < <(git -C "$root" ls-files -o --exclude-standard -z 2>/dev/null)
   } | "$hasher" | awk '{print $1}'
 }
 

@@ -105,7 +105,7 @@ fi
 fallback_find_project_root() {
   local dir="${1:-${PWD}}"
   while [[ "${dir}" != "/" && -n "${dir}" ]]; do
-    if [[ -d "${dir}/.git" || -f "${dir}/harness.config" || -d "${dir}/harness" ]]; then
+    if [[ -e "${dir}/.git" || -f "${dir}/harness.config" || -d "${dir}/harness" ]]; then
       printf '%s\n' "${dir}"
       return 0
     fi
