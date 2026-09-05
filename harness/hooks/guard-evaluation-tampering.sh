@@ -32,8 +32,11 @@ HARNESS_PROTECTED_PATTERNS=(
   "harness/scripts/*.sh"
   "harness/scripts/lib/*"
   "harness/language/*/lang.sh"
-  ".harness/latest-eval.json"
-  ".harness/verify.json"
+  # 런타임 산출물 전체입니다. 개별 파일을 열거했을 때 baseline-eval.json 과
+  # loop-state.json 이 빠져 있었습니다. baseline-eval.json 은 회귀 판정의 기준선이라,
+  # 점수를 못 올리는 에이전트가 기준선을 낮추면 모든 결과가 개선이 됩니다.
+  # 에이전트가 이 디렉터리를 손으로 고칠 일은 없습니다. 전부 스크립트가 씁니다.
+  ".harness/*"
 )
 
 # 경고 대상: 차단하지는 않지만 평가에 영향을 줄 수 있어 사실을 알립니다.
@@ -266,6 +269,53 @@ PAYLOAD="$(read_stdin_payload)"
 FILE_PATH="$(json_field "${PAYLOAD}" '.tool_input.file_path' 'file_path')"
 if [[ -z "${FILE_PATH}" ]]; then
   FILE_PATH="$(json_field "${PAYLOAD}" '.tool_input.notebook_path' 'notebook_path')"
+fi
+
+# --- 셸 명령 검사 -------------------------------------------------------------
+# file_path 만 보면 가드가 Edit 계열 도구에만 걸립니다. 셸 한 줄이면 그대로 우회됩니다.
+#   printf '{"status":"pass"}' > .harness/verify.json
+#   sed -i 's/threshold=90/threshold=0/' harness.config
+# 그래서 명령 문자열도 봅니다. 다만 읽기는 막지 않습니다. cat·grep·git diff 로 보호
+# 파일을 보는 것은 정상 작업이므로, **변경을 일으키는 구문과 함께 나타날 때만** 막습니다.
+# 완전한 셸 파서가 아니므로 우회는 여전히 가능합니다. 이 검사는 실수와 손쉬운
+# 지름길을 막는 것이지 적대적 회피를 막는 것이 아닙니다. 그 한계는 README 에 적었습니다.
+SHELL_COMMAND="$(json_field "${PAYLOAD}" '.tool_input.command' 'command')"
+if [[ -z "${FILE_PATH}" && -n "${SHELL_COMMAND}" ]]; then
+  # 명령 전체에서 경로를 찾으면 오탐이 큽니다.
+  # `bash harness/scripts/verify.sh >/dev/null` 은 보호 파일을 실행할 뿐인데도 걸립니다.
+  # 그래서 **변경 구문이 실제로 겨냥하는 대상**만 뽑습니다.
+  _targets="$(
+    # `> 파일`, `>> 파일` 의 리다이렉션 대상. `2>&1` 은 대상이 &1 이라 걸리지 않습니다.
+    printf '%s' "${SHELL_COMMAND}" | grep -oE '>>?[[:space:]]*[^|&;<>[:space:]]+' | sed -E 's/^>>?[[:space:]]*//'
+    # `tee [-a] 파일`
+    printf '%s' "${SHELL_COMMAND}" | grep -oE '\btee\b([[:space:]]+-[a-zA-Z]+)*[[:space:]]+[^|&;<>[:space:]]+' | sed -E 's/.*[[:space:]]//'
+    # 제자리 편집(sed -i, perl -pi)은 대상이 인자 어디에나 오므로 경로 같은 토큰을 전부 봅니다.
+    if printf '%s' "${SHELL_COMMAND}" | grep -qE '\bsed\b[^|;]*[[:space:]]-i|\bperl\b[^|;]*[[:space:]]-[a-z]*i'; then
+      printf '%s' "${SHELL_COMMAND}" | tr '[:space:]' '\n' | grep -E '[./]' || true
+    fi
+  )"
+  _hit=""
+  while IFS= read -r _tok; do
+    [[ -n "${_tok}" ]] || continue
+    _rel="$(to_relative "${PROJECT_ROOT}" "${_tok}")"
+    _rel="${_rel#./}"
+    if _m="$(matches_any "${_rel}" "${_rel##*/}" ${HARNESS_PROTECTED_PATTERNS[@]+"${HARNESS_PROTECTED_PATTERNS[@]}"})"; then
+      _hit="${_rel}|${_m}"
+      break
+    fi
+  done <<< "${_targets}"
+  if [[ -n "${_hit}" ]]; then
+    if [[ "${HARNESS_ALLOW_GUARDED_EDIT:-}" == "1" ]]; then
+      emit "[harness] HARNESS_ALLOW_GUARDED_EDIT=1 로 보호 파일을 건드리는 셸 명령을 허용했습니다: ${_hit%%|*}"
+      exit 0
+    fi
+    emit "[harness] 셸 명령을 차단했습니다: 보호 대상 ${_hit%%|*} 을(를) 변경하려 합니다 (패턴 ${_hit##*|})."
+    emit "명령: ${SHELL_COMMAND}"
+    emit "평가·게이트 파일을 셸로 우회해 고치는 것은 Edit 로 고치는 것과 같습니다."
+    emit "다음 조치: 이번 실패는 대상 코드에서 고치고, 기준 자체가 잘못되었다면 improvement candidate 를 남깁니다."
+    emit "승인된 변경이라면 HARNESS_ALLOW_GUARDED_EDIT=1 을 붙여 다시 실행합니다."
+    exit 2
+  fi
 fi
 
 # 파일 경로가 없는 도구 호출은 이 hook 의 관심사가 아닙니다.
