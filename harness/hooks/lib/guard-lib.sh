@@ -44,6 +44,17 @@ HARNESS_PROTECTED_PATTERNS=(
   # 런타임 산출물 전체입니다. baseline-eval.json 은 회귀 판정의 기준선이라,
   # 점수를 못 올리는 에이전트가 기준선을 낮추면 모든 결과가 개선이 됩니다.
   ".harness/*"
+  # 게이트를 지키는 범위에는 게이트의 **실행 조건**이 들어갑니다.
+  # hooks/ 를 지키면서 그 hook 을 켜는 파일을 열어 두면, 편집 1회로 PreToolUse 가드와
+  # Stop 게이트와 PostToolUse 검출이 함께 사라집니다. 근거: improvement-log/2026-09-05-005.
+  # settings.local.json 도 막습니다. hooks 블록을 그쪽에도 쓸 수 있고, env 로
+  # HARNESS_ALLOW_GUARDED_EDIT 을 상시로 켜는 것도 그쪽에서 가능합니다.
+  ".claude/settings.json"
+  ".claude/settings.local.json"
+  # 저장소 밖의 심판입니다. 로컬 hook 을 전부 이겨도 여기서 걸리므로 마지막 자리입니다.
+  # 다른 워크플로는 경고에 두어 프로젝트의 정상 작업을 막지 않습니다.
+  ".github/workflows/harness.yml"
+  ".github/CODEOWNERS"
 )
 
 # 경고 대상: 차단하지는 않지만 평가에 영향을 줄 수 있어 사실을 알립니다.

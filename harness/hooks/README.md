@@ -81,6 +81,12 @@ sed -i 's/THRESHOLD=90/THRESHOLD=0/' harness.config  # 합격선 무력화
 
 그래서 `Bash` 도구도 matcher 에 등록하고 `tool_input.command` 를 봅니다. 읽기는 막지 않습니다. `cat`, `grep`, `git diff` 로 보호 파일을 보는 것은 정상 작업입니다. **변경 구문이 실제로 겨냥하는 대상**만 뽑아 대조합니다.
 
+보는 구문은 리다이렉션, `tee`, 제자리 편집, 그리고 복사·이동 계열(`cp`, `mv`, `install`, `truncate`, `dd`, `rsync`, `ln`)입니다. 마지막 묶음은 실제로 뚫린 뒤에 더했습니다. 한 세션에서 `cp` 로 보호 파일 10건이 차단 없이 덮어써졌습니다.
+
+**이 목록은 닫히지 않습니다.** `python -c`, `node -e`, `make`, 임의 스크립트는 여전히 통과합니다. `cp` 를 막으면 `mv` 가, `mv` 를 막으면 인터프리터가 남습니다. `bash` 를 허용하는 순간 전부 허용한 것입니다. 열거를 늘려 닫으려 하지 마십시오. 남는 경로는 사후 검출과 CI 가 담당합니다. 여기서 하는 일은 **가장 손쉬운 지름길을 막고 판단 지점을 만드는 것**까지입니다.
+
+반대 방향의 오탐도 남습니다. 이 검사는 명령 문자열을 봅니다. heredoc 본문이나 인용부호 안에 보호 경로가 등장하기만 해도 걸릴 수 있습니다. 실제로 이 문단을 쓰는 명령이 그 이유로 두 번 차단되었습니다. 근거: improvement-log/2026-09-05-004.
+
 | 검사하는 대상 | 예 |
 | --- | --- |
 | 리다이렉션 대상 | `> 파일`, `>> 파일` (`2>&1` 은 대상이 `&1` 이라 걸리지 않습니다) |
@@ -99,7 +105,7 @@ sed -i 's/THRESHOLD=90/THRESHOLD=0/' harness.config  # 합격선 무력화
 
 | 층 | 위치 | 담는 것 |
 | --- | --- | --- |
-| 코어 | 스크립트 상단의 `HARNESS_PROTECTED_PATTERNS`, `HARNESS_WARN_PATTERNS` | `harness.config`, `harness/evaluation/*`, `harness/rules/*`, `harness/language/*/lang.sh` 처럼 언어와 무관한 하네스 자체의 파일. 프로젝트 고유 추가분도 여기 적습니다 |
+| 코어 | [`lib/guard-lib.sh`](lib/guard-lib.sh) 의 `HARNESS_PROTECTED_PATTERNS`, `HARNESS_WARN_PATTERNS` | `harness.config`, `harness/evaluation/*`, `harness/rules/*`, `harness/language/*/lang.sh` 처럼 언어와 무관한 하네스 자체의 파일. 프로젝트 고유 추가분도 여기 적습니다 |
 | 언어 팩 | `harness/language/<언어>/lang.sh` 의 `HARNESS_LANG_<언어>_PROTECTED_PATTERNS` 등 | lint·타입·테스트 러너·아키텍처 규칙 설정처럼 언어에 종속된 파일 |
 
 **보호 목록은 스택 감지 결과에 의존하지 않습니다.** hook 은 로드된 **모든** 팩의 패턴(공통 + 모든 kind)을 코어 목록에 합칩니다. Java 저장소에서도 `tsconfig.json` 이 차단되고, 스택을 감지하지 못한 저장소에서도 `checkstyle.xml` 과 `ruff.toml` 이 차단됩니다.

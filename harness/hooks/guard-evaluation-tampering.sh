@@ -247,6 +247,18 @@ if [[ -z "${FILE_PATH}" && -n "${SHELL_COMMAND}" ]]; then
     if printf '%s' "${SHELL_COMMAND}" | grep -qE '\bsed\b[^|;]*[[:space:]]-i|\bperl\b[^|;]*[[:space:]]-[a-z]*i'; then
       printf '%s' "${SHELL_COMMAND}" | tr '[:space:]' '\n' | grep -E '[./]' || true
     fi
+    # 같은 일을 다른 이름으로 하는 명령들. cp 로 보호 파일을 덮어쓰는 경로가 실제로
+    # 열려 있었고, 한 세션에서 10건이 그렇게 통과했습니다. 대상이 인자 어디에 오는지
+    # 형태가 제각각이라 제자리 편집과 같은 방식으로 경로 같은 토큰을 전부 봅니다.
+    # 보호 파일을 읽어서 다른 곳으로 복사하는 경우까지 걸리지만, 근거 없이 여는
+    # 것보다 닫는 쪽이 맞습니다.
+    #
+    # 이 목록은 닫히지 않습니다. python -c, node -e, make, 임의 스크립트는 여전히
+    # 통과합니다. 열거로 닫으려 하지 마십시오. 남는 경로는 사후 검출
+    # (detect-guarded-change.sh)과 CI(.github/workflows/harness.yml)가 담당합니다.
+    if printf '%s' "${SHELL_COMMAND}" | grep -qE '\b(cp|mv|install|truncate|dd|rsync|ln)\b'; then
+      printf '%s' "${SHELL_COMMAND}" | tr '[:space:]' '\n' | grep -E '[./]' || true
+    fi
   )"
   _hit=""
   while IFS= read -r _tok; do
