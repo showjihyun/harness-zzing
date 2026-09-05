@@ -67,7 +67,7 @@ HARNESS_EVAL_WEIGHTS=(
 HARNESS_THRESHOLD=80
 
 # ---------------------------------------------------------------------------
-# HARNESS_MAX_ITERATIONS — loop 최대 반복 횟수입니다. 사양 6.7 의 기본값은 8 입니다.
+# HARNESS_MAX_ITERATIONS — loop 최대 반복 횟수입니다. rules/loop-budget.rule.md 의 기본값은 8 입니다.
 # 영향을 받는 스크립트: loop.sh
 HARNESS_MAX_ITERATIONS=8
 
@@ -95,7 +95,7 @@ HARNESS_NO_IMPROVEMENT_ROUNDS=2
 HARNESS_AGENT_CMD=""
 
 # ---------------------------------------------------------------------------
-# 선택 확장 키 (사양 6.6 의 고정 키는 아닙니다. 없어도 모두 동작합니다.)
+# 선택 확장 키 (language/README.md 2절의 고정 키는 아닙니다. 없어도 모두 동작합니다.)
 #
 # HARNESS_MAX_SECONDS — loop 전체의 시간 예산(초)입니다. 0 이면 무제한입니다.
 #   영향을 받는 스크립트: loop.sh (종료 사유 budget_exceeded)

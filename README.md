@@ -235,7 +235,7 @@ All scripts are Bash and take `--help`.
 | `harness/scripts/verify.sh` | Runs every configured verification step, writes `.harness/verify.json` | `--list`, `--only <id>`, `--json`, `--continue-on-fail` |
 | `harness/scripts/eval.sh` | Aggregates verify results into the six weighted layers, writes `.harness/latest-eval.json` | `--reuse`, `--threshold <n>`, `--json` |
 | `harness/scripts/pass-threshold.sh` | Compares the evaluation score against the pass line | `--threshold <n>`, `--quiet` |
-| `harness/scripts/loop.sh` | Budgeted loop runner implementing every stop condition, state in `.harness/loop-state.json` | `--dry-run`, `--max-iterations <n>`, `--threshold <n>`, `--porcelain` |
+| `harness/scripts/loop.sh` | Budgeted loop runner implementing every stop condition, state in `.harness/loop-state.json` | `--dry-run`, `--max-iterations <n>`, `--threshold <n>` |
 | `harness/scripts/improvement-log.sh` | Creates, lists, validates and transitions improvement candidates | `new`, `list`, `validate`, `set-status` |
 | `harness/scripts/self-check.sh` | Checks that the harness *bundle itself* holds together | `--list`, `--only <id>` |
 

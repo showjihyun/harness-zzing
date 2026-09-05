@@ -173,13 +173,14 @@ if selected links; then
   # harness.config 에서 HARNESS_SELF_CHECK_LINK_DIRS 에 프로젝트 루트 기준 상대 경로를 공백으로 나열합니다.
   # 채택하지 않은 프로젝트의 문서를 임의로 훑으면 의도적인 외부 링크까지 실패로 잡히므로 기본값은 번들뿐입니다.
   link_roots=("${HARNESS_DIR}")
+  missing_roots=""
   if [[ -n "${HARNESS_SELF_CHECK_LINK_DIRS:-}" ]]; then
     _proj="${HARNESS_PROJECT_ROOT_RESOLVED}"
     for _d in ${HARNESS_SELF_CHECK_LINK_DIRS}; do
       if [[ -e "${_proj}/${_d}" ]]; then
         link_roots+=("${_proj}/${_d}")
       else
-        report_fail links "HARNESS_SELF_CHECK_LINK_DIRS 의 경로가 없습니다: ${_d}"
+        missing_roots="${missing_roots} ${_d}"
       fi
     done
   fi
@@ -194,10 +195,16 @@ if selected links; then
       [[ -e "${d}/${target}" ]] || broken="${broken}\n    ${f#"${HARNESS_DIR}/"} -> ${link}"
     done < <(grep -oE '\]\([^)]+\)' "$f" | sed -E 's/^\]\((.*)\)$/\1/' | grep -vE '^(http|mailto)' || true)
   done < <(find "${link_roots[@]}" -name '*.md' -type f)
-  if [[ -z "$broken" ]]; then
-    report_pass links "상대 링크 ${count}건이 전부 실재합니다 (대상 ${#link_roots[@]}곳)"
-  else
+  # 한 검사는 한 줄만 보고합니다. 예전에는 없는 경로를 만나면 그 자리에서
+  # report_fail 하고도 아래까지 흘러가 [FAIL] 과 [ok] 를 둘 다 출력했습니다.
+  # verify.sh 는 로그의 마지막 줄을 verify.json 의 summary 로 쓰므로,
+  # 기계가 읽는 결과에는 성공 메시지가 실패 사유로 기록되었습니다.
+  if [[ -n "$missing_roots" ]]; then
+    report_fail links "HARNESS_SELF_CHECK_LINK_DIRS 의 경로가 없습니다:${missing_roots}"
+  elif [[ -n "$broken" ]]; then
     report_fail links "끊어진 링크:$(printf '%b' "$broken")"
+  else
+    report_pass links "상대 링크 ${count}건이 전부 실재합니다 (대상 ${#link_roots[@]}곳)"
   fi
 fi
 

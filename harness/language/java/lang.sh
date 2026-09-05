@@ -72,10 +72,19 @@ harness_lang_java_default_steps() {
       _emit_step compile correctness true "${m} -q compile"
       _emit_step test correctness true "${m} test"
       # verify 는 failsafe(통합 테스트)·checkstyle·spotbugs 를 묶어 실행합니다.
-      # surefire 만 끕니다. 위 test 단계에서 이미 돌았기 때문입니다.
-      # -DskipTests 를 쓰면 failsafe 까지 꺼져 통합 테스트가 하나도 돌지 않은 채
-      # architecture 계층이 통과로 채점됩니다. 주석과 실제 동작이 반대가 됩니다.
-      _emit_step verify architecture false "${m} -Dsurefire.skip=true verify"
+      #
+      # 스킵 플래그를 붙이지 않습니다. 위 test 단계에서 이미 돈 단위 테스트가
+      # 여기서 한 번 더 돕니다. 그 중복을 감수하는 이유는, surefire 만 끄고
+      # failsafe 는 살리는 **사용자 속성이 없기** 때문입니다.
+      #   -DskipTests        surefire 와 failsafe 를 모두 끕니다 → 통합 테스트가
+      #                      하나도 돌지 않은 채 architecture 계층이 통과로 채점됩니다.
+      #   -Dsurefire.skip    surefire 의 사용자 속성이 아닙니다. 무시되고 그대로 다 돕니다.
+      #                      (이전 커밋이 이 값을 넣었는데 동작하지 않았습니다.)
+      # 둘 중 하나를 고르면 "조용히 안 돌거나" "주석과 다르게 도는" 상태가 됩니다.
+      # 중복 실행은 시간 비용일 뿐이고 결과는 정직합니다. 그래서 중복을 택합니다.
+      # 단위 테스트를 정말 한 번만 돌리려면 POM 에서 surefire 실행에 skip 속성을
+      # 바인딩하십시오(예: <skipTests>${skipUTs}</skipTests>). 그것은 프로젝트의 몫입니다.
+      _emit_step verify architecture false "${m} verify"
       ;;
     *)
       : # 알 수 없는 변형 — 단계 없음

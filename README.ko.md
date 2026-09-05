@@ -209,7 +209,7 @@ AI 코딩 에이전트가 일하는 *환경*을 만드는 킷입니다. 에이�
 | `harness/scripts/verify.sh` | 설정된 모든 검증 단계를 실행하고 `.harness/verify.json` 을 씁니다 | `--list`, `--only <id>`, `--json`, `--continue-on-fail` |
 | `harness/scripts/eval.sh` | verify 결과를 6개 가중 계층으로 집계해 `.harness/latest-eval.json` 을 씁니다 | `--reuse`, `--threshold <n>`, `--json` |
 | `harness/scripts/pass-threshold.sh` | 평가 점수를 합격선과 비교합니다 | `--threshold <n>`, `--quiet` |
-| `harness/scripts/loop.sh` | 모든 종료 조건을 구현한 예산 기반 루프 러너. 상태는 `.harness/loop-state.json` | `--dry-run`, `--max-iterations <n>`, `--threshold <n>`, `--porcelain` |
+| `harness/scripts/loop.sh` | 모든 종료 조건을 구현한 예산 기반 루프 러너. 상태는 `.harness/loop-state.json` | `--dry-run`, `--max-iterations <n>`, `--threshold <n>` |
 | `harness/scripts/improvement-log.sh` | 개선 후보를 만들고 조회하고 검증하고 상태를 전이시킵니다 | `new`, `list`, `validate`, `set-status` |
 | `harness/scripts/self-check.sh` | 하네스 *번들 자신*이 성립하는지 검사합니다 | `--list`, `--only <id>` |
 

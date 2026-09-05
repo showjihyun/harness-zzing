@@ -35,7 +35,9 @@ Android 는 아직 별도 kind 로 다루지 않습니다. 필요해지면 `Andr
 | gradle | `integration` | `correctness` | true | `./gradlew --console=plain integrationTest` | `src/integrationTest/` 또는 `src/intTest/` 가 있을 때 |
 | maven | `compile` | `correctness` | true | `./mvnw -B -q compile` | 항상 |
 | maven | `test` | `correctness` | true | `./mvnw -B test` | 항상 |
-| maven | `verify` | `architecture` | false | `./mvnw -B -Dsurefire.skip=true verify` | 항상 (failsafe·checkstyle·spotbugs 가 `verify` 에 묶여 있을 때). surefire 만 끕니다. `-DskipTests` 는 failsafe 까지 꺼서 통합 테스트가 돌지 않습니다 |
+| maven | `verify` | `architecture` | false | `./mvnw -B verify` | 항상 (failsafe·checkstyle·spotbugs 가 `verify` 에 묶여 있을 때). 스킵 플래그를 붙이지 않으므로 위 `test` 의 단위 테스트가 한 번 더 돕니다 |
+
+Maven 의 `verify` 단계에 스킵 플래그를 붙이지 않는 이유를 적어 둡니다. `-DskipTests` 는 surefire 와 failsafe 를 **둘 다** 꺼서 통합 테스트가 하나도 돌지 않은 채 `architecture` 계층이 통과로 채점됩니다. `-Dsurefire.skip` 은 surefire 의 사용자 속성이 아니라 무시됩니다. surefire 만 끄고 failsafe 는 살리는 명령행 속성이 없으므로, 단위 테스트가 두 번 도는 시간 비용을 감수하고 결과의 정직함을 택했습니다. 한 번만 돌리려면 POM 에서 surefire 실행에 skip 속성을 바인딩하십시오. 그것은 프로젝트의 몫입니다.
 
 명령의 `./gradlew`·`./mvnw` 접두사는 래퍼가 있을 때이고, 없으면 `gradle`·`mvn` 으로 바뀝니다. 실제 생성 결과는 `harness/scripts/verify.sh --list` 로 확인하십시오.
 
