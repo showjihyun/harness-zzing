@@ -130,6 +130,26 @@ now_ms() {
 
 now_iso() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 
+# harness_tree_fingerprint <프로젝트루트> — HEAD 와 더티 목록의 해시입니다.
+#
+# verify 결과가 "지금 이 트리"의 것인지 판정하는 데 씁니다. 시각만으로는 검증한 뒤
+# 파일을 고치고 종료하는 경우를 잡을 수 없고, 시각이 없으면 며칠 지난 pass 가
+# 오늘의 종료를 통과시킵니다. 두 값을 함께 기록해야 게이트가 성립합니다.
+# git 저장소가 아니거나 해시 도구가 없으면 빈 문자열을 냅니다. 그 환경에서는
+# 신선도를 판정하지 않습니다(판정할 근거가 없는 것을 통과로도 실패로도 쓰지 않습니다).
+harness_tree_fingerprint() {
+  local root="${1:-$PWD}" hasher="" h=""
+  git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+  for h in sha1sum shasum md5sum cksum; do
+    if command -v "$h" >/dev/null 2>&1; then hasher="$h"; break; fi
+  done
+  [[ -n "$hasher" ]] || return 0
+  {
+    git -C "$root" rev-parse HEAD 2>/dev/null || printf 'no-head\n'
+    git -C "$root" status --porcelain 2>/dev/null || true
+  } | "$hasher" | awk '{print $1}'
+}
+
 # --- 설정 ---------------------------------------------------------------------
 # load_config [프로젝트루트] — 루트에 harness.config 가 있으면 source 합니다.
 # 로드한 파일 경로는 HARNESS_CONFIG_FILE 에 담기고, 없으면 빈 문자열입니다.

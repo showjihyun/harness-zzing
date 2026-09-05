@@ -121,6 +121,7 @@ say ""
 
 # --- 파싱과 검증 ---------------------------------------------------------------
 IDS=(); LAYERS=(); REQUIREDS=(); COMMANDS=()
+DEFINED_TOTAL=0   # --only 로 걸러내기 **전**의 단계 수. 부분 실행 판정에 씁니다.
 for _line in ${STEP_LINES[@]+"${STEP_LINES[@]}"}; do
   [[ -z "$_line" || "$_line" == \#* ]] && continue
   IFS='|' read -r _id _layer _req _cmd <<<"$_line"
@@ -134,6 +135,7 @@ for _line in ${STEP_LINES[@]+"${STEP_LINES[@]}"}; do
     false|no|0|optional|"") _req="false" ;;
     *) die "required 값이 잘못되었습니다: ${_req} (단계 ${_id})" 3 ;;
   esac
+  DEFINED_TOTAL=$((DEFINED_TOTAL + 1))
   if [[ ${#ONLY_IDS[@]} -gt 0 ]]; then
     _match=0
     for _o in "${ONLY_IDS[@]}"; do [[ "$_o" == "$_id" ]] && _match=1; done
@@ -161,10 +163,24 @@ harness_ensure_state_dir "$ROOT"
 
 write_verify_json() {
   local status="$1" failed_required="$2" failed_optional="$3" steps_json="$4"
+  local only_json="" sep="" i=0 partial="false"
+  for ((i = 0; i < ${#ONLY_IDS[@]}; i++)); do
+    only_json="${only_json}${sep}\"${ONLY_IDS[$i]}\""
+    sep=", "
+  done
+  if [[ "$TOTAL" -lt "$DEFINED_TOTAL" ]]; then partial="true"; fi
   {
     printf '{\n'
     printf '  "schema": "harness.verify/1",\n'
     printf '  "status": "%s",\n' "$status"
+    # 부분 실행 표시. 이 세 키가 없으면 --only 한 번의 결과가 전량 실행과 구별되지 않습니다.
+    printf '  "partial": %s,\n' "$partial"
+    printf '  "defined_steps": %s,\n' "$DEFINED_TOTAL"
+    printf '  "ran_steps": %s,\n' "$TOTAL"
+    printf '  "only": [%s],\n' "$only_json"
+    # 신선도 근거. 둘 다 없으면 며칠 지난 pass 가 오늘의 종료를 통과시킵니다.
+    printf '  "finished_at": "%s",\n' "$(now_iso)"
+    printf '  "tree": "%s",\n' "$(harness_tree_fingerprint "$ROOT")"
     printf '  "steps": [\n'
     printf '%s' "$steps_json"
     printf '  ],\n'

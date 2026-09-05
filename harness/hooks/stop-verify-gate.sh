@@ -20,6 +20,8 @@ Claude Code 의 Stop hook 으로 등록해 사용합니다. hook JSON 을 stdin 
   - stop_hook_active 가 true 이면 즉시 통과합니다(무한 루프 방지).
   - HARNESS_SKIP_STOP_GATE=1 이면 통과하되 stderr 에 우회 사실을 남깁니다.
   - .harness/verify.json 이 없거나 status 가 pass 가 아니면 exit 2 로 종료를 차단합니다.
+  - 마지막 검증이 --only 부분 실행이었으면 차단합니다.
+  - 검증 이후 작업 트리가 바뀌었으면(지문 불일치) 차단합니다.
 
 환경 변수:
   HARNESS_SKIP_STOP_GATE=1   게이트를 우회합니다(위험).
@@ -111,6 +113,48 @@ json_string() {
   printf '%s' "${value}"
 }
 
+# json_raw <file> <key> — 최상위 값을 따옴표 없이 출력합니다.
+# json_string 과 달리 불리언·숫자도 읽습니다. partial 과 ran_steps 가 그 형태입니다.
+json_raw() {
+  local file="$1" key="$2" value="" content="" head=""
+  [[ -f "${file}" ]] || return 0
+  if command -v jq >/dev/null 2>&1; then
+    value="$(jq -r --arg k "${key}" 'if has($k) then (.[$k] | tostring) else empty end' "${file}" 2>/dev/null || true)"
+  fi
+  if [[ -z "${value}" ]]; then
+    content="$(cat -- "${file}")"
+    head="${content%%\"steps\"*}"
+    # 앞에서부터 키와 첫 콜론만 떼어냅니다. '.*:' 로 쓰면 탐욕적 매칭이
+    # 값 안의 콜론(예: 2026-09-05T02:44:43Z)까지 먹어 값이 잘립니다.
+    value="$(printf '%s' "${head}" \
+      | grep -oE "\"${key}\"[[:space:]]*:[[:space:]]*(\"[^\"]*\"|[^,[:space:]}]+)" \
+      | head -n 1 | sed -E 's/^"[^"]*"[[:space:]]*:[[:space:]]*//; s/^"//; s/"$//' || true)"
+  fi
+  printf '%s' "${value}"
+}
+
+# 작업 트리 지문. lib/common.sh 가 있으면 그쪽 정본을 씁니다.
+fallback_tree_fingerprint() {
+  local root="${1:-$PWD}" hasher="" h=""
+  git -C "${root}" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+  for h in sha1sum shasum md5sum cksum; do
+    if command -v "${h}" >/dev/null 2>&1; then hasher="${h}"; break; fi
+  done
+  [[ -n "${hasher}" ]] || return 0
+  {
+    git -C "${root}" rev-parse HEAD 2>/dev/null || printf 'no-head\n'
+    git -C "${root}" status --porcelain 2>/dev/null || true
+  } | "${hasher}" | awk '{print $1}'
+}
+
+tree_fingerprint_of() {
+  if declare -F harness_tree_fingerprint >/dev/null 2>&1; then
+    harness_tree_fingerprint "$1"
+  else
+    fallback_tree_fingerprint "$1"
+  fi
+}
+
 # failed_step_ids <file> — 실패한 step id 목록을 공백으로 이어 출력합니다.
 failed_step_ids() {
   local file="$1"
@@ -167,6 +211,38 @@ if [[ "${STATUS}" != "pass" ]]; then
   fi
   emit "다음 조치: 실패한 단계의 로그(.harness/logs/)를 읽고 원인을 고친 뒤 ./harness/scripts/verify.sh 를 다시 실행합니다."
   emit "테스트나 lint 규칙을 약화시켜 통과시키지 않습니다."
+  exit 2
+fi
+
+# 4. 부분 실행. --only 로 일부 단계만 돈 결과는 완료 근거가 아닙니다.
+#    이 검사가 없으면 5단계 중 1단계만 돌린 pass 가 전량 통과와 구별되지 않습니다.
+PARTIAL="$(json_raw "${VERIFY_JSON}" "partial")"
+if [[ "${PARTIAL}" == "true" ]]; then
+  RAN="$(json_raw "${VERIFY_JSON}" "ran_steps")"
+  DEFINED="$(json_raw "${VERIFY_JSON}" "defined_steps")"
+  emit "[harness] 종료를 차단했습니다: 마지막 검증이 부분 실행이었습니다 (${RAN:-?}/${DEFINED:-?} 단계)."
+  emit "--only 로 거른 결과는 완료 근거가 아닙니다. 실행되지 않은 단계는 통과한 것이 아닙니다."
+  emit "다음 조치: ./harness/scripts/verify.sh 를 옵션 없이 실행합니다."
+  exit 2
+fi
+
+# 5. 신선도. 검증한 뒤 파일을 고치고 종료하면 그 결과는 이 작업의 것이 아닙니다.
+FINISHED_AT="$(json_raw "${VERIFY_JSON}" "finished_at")"
+RECORDED_TREE="$(json_raw "${VERIFY_JSON}" "tree")"
+
+if [[ -z "${FINISHED_AT}" ]]; then
+  emit "[harness] 종료를 차단했습니다: ${VERIFY_REL} 에 신선도 근거가 없습니다."
+  emit "이 파일은 finished_at 과 tree 를 기록하기 이전 버전의 verify.sh 가 만든 것입니다."
+  emit "다음 조치: ./harness/scripts/verify.sh 를 다시 실행합니다."
+  exit 2
+fi
+
+CURRENT_TREE="$(tree_fingerprint_of "${PROJECT_ROOT}")"
+if [[ -n "${RECORDED_TREE}" && -n "${CURRENT_TREE}" && "${RECORDED_TREE}" != "${CURRENT_TREE}" ]]; then
+  emit "[harness] 종료를 차단했습니다: 검증 이후 작업 트리가 바뀌었습니다."
+  emit "마지막 검증: ${FINISHED_AT} (당시 지문 ${RECORDED_TREE:0:12}, 현재 ${CURRENT_TREE:0:12})"
+  emit "그 결과는 지금의 변경을 검증한 것이 아닙니다."
+  emit "다음 조치: ./harness/scripts/verify.sh 를 다시 실행합니다."
   exit 2
 fi
 

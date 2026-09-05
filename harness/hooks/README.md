@@ -17,7 +17,7 @@
 
 ### stop-verify-gate.sh
 
-에이전트가 "다 했습니다"라고 선언하는 순간에 `.harness/verify.json` 을 확인합니다. 검증이 실행되지 않았거나 `status` 가 `pass` 가 아니면 종료를 차단하고, 무엇이 실패했는지와 다음 조치를 stderr 로 돌려줍니다.
+에이전트가 "다 했습니다"라고 선언하는 순간에 `.harness/verify.json` 을 확인합니다. 검증이 실행되지 않았거나, 일부 단계만 돌았거나, 검증한 뒤 파일이 바뀌었거나, `status` 가 `pass` 가 아니면 종료를 차단하고 다음 조치를 stderr 로 돌려줍니다.
 
 | 판정 | 결과 |
 | --- | --- |
@@ -25,7 +25,12 @@
 | `HARNESS_SKIP_STOP_GATE=1` | exit 0 + 우회 사실을 stderr 에 기록 |
 | `.harness/verify.json` 없음 | exit 2, 종료 차단 |
 | `status` 가 `pass` 가 아님 | exit 2, 실패한 step id 와 함께 차단 |
-| `status` 가 `pass` | exit 0 |
+| `partial` 이 `true` | exit 2, 실행한 단계 수와 정의된 단계 수를 함께 차단 |
+| `finished_at` 이 없음 | exit 2, 신선도 근거가 없는 옛 파일이므로 차단 |
+| `tree` 가 현재 작업 트리 지문과 다름 | exit 2, 검증 이후 변경이 있으므로 차단 |
+| 위 어느 것도 아님 | exit 0 |
+
+`status` 하나만 보면 두 가지 우회가 열립니다. `verify.sh --only <id>` 로 한 단계만 돌린 결과가 전량 통과와 구별되지 않고, 며칠 전의 `pass` 가 오늘의 종료를 통과시킵니다. `partial`·`finished_at`·`tree` 세 키가 그 둘을 각각 닫습니다. `tree` 는 `HEAD` 와 `git status --porcelain` 의 해시라, 검증한 뒤 한 줄이라도 고치면 값이 달라집니다. git 저장소가 아니거나 해시 도구가 없으면 `tree` 가 빈 문자열이 되고 그때는 신선도를 판정하지 않습니다.
 
 ### guard-evaluation-tampering.sh
 
