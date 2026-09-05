@@ -26,7 +26,11 @@ layer_score = round( passed_steps / total_steps * 100 )
 
 - `total_steps` 는 그 계층에 속한 판정 단계의 총 개수입니다. 실행하지 못한 단계도 분모에 포함합니다.
 - `passed_steps` 는 `status: pass` 인 단계의 개수입니다. `fail` 과 `error` 는 모두 미통과입니다.
-- 판정 단계는 `harness.config` 의 `HARNESS_STEPS` 항목(`"id|layer|required|command"`)과 task 문서의 합격 기준 항목입니다. 하나의 단계는 통과 또는 미통과 둘 중 하나이며 중간값을 갖지 않습니다.
+- 판정 단계는 두 출처에서 오고, **서로 다른 파일이 소유합니다.**
+  - `harness.config` 의 `HARNESS_STEPS` 항목(`"id|layer|required|command"`)은 `scripts/eval.sh` 가 실행하고 집계해 `.harness/latest-eval.json` 에 넣습니다. 이 산출이 답하는 질문은 "하네스 자신이 성립하는가" 하나입니다.
+  - task 문서의 합격 기준 항목은 **`eval.sh` 가 실행하지도 집계하지도 않습니다.** 그 판정은 새 세션의 에이전트나 사람이 수행하고 [runs/](runs/) 의 실행 기록이 소유합니다.
+  - 두 출처를 하나의 `score` 로 섞지 않습니다. 섞으면 실행하지 않은 task 가 통과로 계산됩니다.
+- 하나의 단계는 통과 또는 미통과 둘 중 하나이며 중간값을 갖지 않습니다.
 - `total_steps` 가 0인 계층은 점수를 0으로 두지 않습니다. `scripts/eval.sh` 는 그 계층의 `score` 를 `null` 로 두고 가중치를 나머지 계층에 비례 재분배합니다. 미구현 사유는 `notes` 에 남깁니다.
 
 예: `correctness` 에 unit, integration, e2e 세 단계가 있고 e2e 만 실패하면 `round(2/3*100) = 67` 입니다.
