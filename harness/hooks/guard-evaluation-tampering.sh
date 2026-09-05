@@ -198,17 +198,46 @@ read_stdin_payload() {
   fi
 }
 
+# json_unescape <문자열> — JSON 문자열 리터럴의 이스케이프를 풉니다.
+#
+# 이것이 없으면 가드가 실질적으로 무력해집니다. Windows 경로는 페이로드에
+# "C:\\WorkSpace\\...\\verify.sh" 로 옵니다(JSON 에서 백슬래시는 \\ 로 이스케이프됩니다).
+# 풀지 않으면 to_relative 가 \ 하나하나를 / 로 바꿔 "C://WorkSpace//...//verify.sh" 가 되고,
+# 루트 접두사 제거가 실패하며, '/' 를 포함한 모든 패턴(harness/scripts/*.sh, harness/rules/*,
+# harness/hooks/*, evaluation/*, .harness/*)이 빗나갑니다.
+# 파일명만 보는 패턴(harness.config)은 계속 걸리므로 가드가 살아 있는 것처럼 보입니다.
+# jq 가 있으면 jq -r 이 이미 풀어 주므로 이 경로는 폴백에서만 씁니다.
+# 근거: 2026-09-05 라운드, HLD-1 보고 + 직접 재현(슬래시 경로 exit 2 / 이스케이프 경로 exit 0).
+#
+# \u 시퀀스는 처리하지 않습니다. 경로에 거의 오지 않고, 처리하려면 fork 가 필요해
+# hook 의 시간 예산(1초)을 해칩니다. 걸리지 않는 경우가 생기면 후보로 남깁니다.
+json_unescape() {
+  local s="${1-}"
+  # \\ 를 먼저 자리표시자로 치웁니다. 그러지 않으면 "C:\\new" 의 \\ 와 n 이
+  # 붙어 \n 으로 읽혀 개행이 됩니다.
+  s="${s//\\\\/$'\001'}"
+  s="${s//\\\"/\"}"
+  s="${s//\\\//\/}"
+  s="${s//\\n/$'\n'}"
+  s="${s//\\t/$'\t'}"
+  s="${s//\\r/$'\r'}"
+  s="${s//$'\001'/\\}"
+  printf '%s' "${s}"
+}
+
 # json_field <payload> <jq-path> <grep-key> — 문자열 값을 출력합니다.
 json_field() {
-  local payload="$1" jq_path="$2" grep_key="$3" value=""
+  local payload="$1" jq_path="$2" grep_key="$3" value="" raw=""
   if command -v jq >/dev/null 2>&1; then
     value="$(printf '%s' "${payload}" | jq -r "${jq_path} // empty" 2>/dev/null || true)"
   fi
   if [[ -z "${value}" ]]; then
-    value="$(printf '%s' "${payload}" \
-      | grep -oE "\"${grep_key}\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" \
+    # 값 안의 \" 도 넘겨야 하므로 (\\.|[^"\\])* 로 읽고, 앞에서부터 키와 첫 콜론만 떼어냅니다.
+    raw="$(printf '%s' "${payload}" \
+      | grep -oE "\"${grep_key}\"[[:space:]]*:[[:space:]]*\"(\\\\.|[^\"\\\\])*\"" \
       | head -n 1 \
-      | sed -E 's/.*:[[:space:]]*"([^"]*)"/\1/' || true)"
+      | sed -E 's/^"[^"]*"[[:space:]]*:[[:space:]]*"//; s/"$//' || true)"
+    value="$(json_unescape "${raw}")"
   fi
   printf '%s' "${value}"
 }
