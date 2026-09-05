@@ -79,6 +79,22 @@ else
   [[ -f "$VERIFY_FILE" ]] || die "verify.sh 가 ${HARNESS_VERIFY_JSON} 을 만들지 못했습니다." 3
 fi
 
+# 부분 실행 결과는 채점하지 않습니다.
+#
+# verify.sh --only 로 한 단계만 돈 결과에도 status: pass 가 붙습니다. 그것을 그대로
+# 집계하면 실행되지 않은 계층이 전부 null 이 되어 가중치가 실행된 한 계층으로
+# 재분배되고, 총점 100 / pass: true 가 나옵니다. evaluation/README.md 와
+# skills/harness-promote/SKILL.md 는 이 출력을 회귀·승격의 근거로 쓰므로,
+# 5개 필수 단계 중 1개만 돈 결과가 승격을 인증하게 됩니다.
+# stop 게이트가 partial 을 막는 것과 같은 이유이며, 여기가 더 중요합니다.
+# 게이트는 한 세션의 종료를 막지만 이쪽은 하네스에 영구히 들어갈 변경을 판정합니다.
+_partial="$(json_num_field "$(tr '\n' ' ' < "$VERIFY_FILE")" partial)"
+if [[ "$_partial" == "true" ]]; then
+  _ran="$(json_num_field "$(tr '\n' ' ' < "$VERIFY_FILE")" ran_steps)"
+  _defined="$(json_num_field "$(tr '\n' ' ' < "$VERIFY_FILE")" defined_steps)"
+  die "${HARNESS_VERIFY_JSON} 이 부분 실행 결과입니다 (${_ran:-?}/${_defined:-?} 단계). 부분 실행은 채점하지 않습니다. verify.sh 를 --only 없이 실행한 뒤 다시 시도하십시오." 3
+fi
+
 # --- verify.json 의 단계 읽기 ---------------------------------------------------
 STEP_IDS=(); STEP_LAYERS=(); STEP_STATUS=(); STEP_LOGS=()
 while IFS= read -r line; do

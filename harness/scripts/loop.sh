@@ -250,10 +250,16 @@ while :; do
   "${SCRIPT_DIR}/eval.sh" ${THRESHOLD_ARGS[@]+"${THRESHOLD_ARGS[@]}"}
   eval_code=$?
   set -e
-  if [[ "$eval_code" -eq 3 ]]; then
+  # eval.sh 는 성공하면 0 을 냅니다(합격 여부와 무관하게). 0 이 아니면 이번 라운드의
+  # 점수가 나오지 않은 것입니다. 예전에는 3 만 특별 취급해서 2(--reuse 대상 없음),
+  # 126(실행 권한 없음), 127(명령 없음)이 그대로 흘러가 아래 read_eval 이
+  # **직전 라운드의 latest-eval.json** 을 이번 라운드 점수로 읽었습니다.
+  # 커밋 768170f 가 eval.sh 안에서 고친 것과 같은 결함이 한 계층 위에 남아 있었습니다.
+  if [[ "$eval_code" -ne 0 ]]; then
     STOPPED_REASON="eval_unavailable"
     write_state
-    log_error "평가를 계산할 수 없어 loop 를 중단합니다. 사유: 실행 가능한 verify 단계가 없습니다."
+    log_error "평가를 계산할 수 없어 loop 를 중단합니다 (eval.sh exit ${eval_code})."
+    log_error "직전 라운드의 ${HARNESS_EVAL_JSON} 을 이번 라운드 결과로 쓰지 않습니다."
     exit 2
   fi
 
