@@ -137,21 +137,32 @@ json_raw() {
 # common.sh 의 harness_tree_fingerprint 와 **같은 입력**을 해시해야 합니다.
 # 다르면 verify 가 기록한 지문과 게이트가 계산한 지문이 영원히 어긋나 모든 종료가 막힙니다.
 fallback_tree_fingerprint() {
-  local root="${1:-$PWD}" hasher="" h="" f=""
+  local root="${1:-$PWD}" hasher="" h="" p="" line="" meta="" blob=""
   git -C "${root}" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
   for h in sha1sum shasum md5sum cksum; do
     if command -v "${h}" >/dev/null 2>&1; then hasher="${h}"; break; fi
   done
   [[ -n "${hasher}" ]] || return 0
+  local -A _dirty=()
+  while IFS= read -r -d '' p; do _dirty["${p}"]=1; done \
+    < <(git -C "${root}" diff --name-only -z 2>/dev/null)
   {
-    git -C "${root}" rev-parse HEAD 2>/dev/null || printf 'no-head\n'
-    git -C "${root}" status --porcelain 2>/dev/null || true
-    git -C "${root}" diff HEAD 2>/dev/null || true
-    while IFS= read -r -d '' f; do
-      printf '%s ' "${f}"
-      git -C "${root}" hash-object -- "${root}/${f}" 2>/dev/null || printf 'unhashable\n'
+    while IFS= read -r -d '' line; do
+      meta="${line%%$'\t'*}"
+      p="${line#*$'\t'}"
+      [[ -f "${root}/${p}" ]] || continue
+      if [[ -n "${_dirty[$p]:-}" ]]; then
+        blob="$(git -C "${root}" hash-object -- "${root}/${p}" 2>/dev/null || printf 'unhashable')"
+      else
+        blob="${meta#* }"; blob="${blob%% *}"
+      fi
+      printf '%s %s\n' "${p}" "${blob}"
+    done < <(git -C "${root}" ls-files -s -z 2>/dev/null)
+    while IFS= read -r -d '' p; do
+      [[ -f "${root}/${p}" ]] || continue
+      printf '%s %s\n' "${p}" "$(git -C "${root}" hash-object -- "${root}/${p}" 2>/dev/null || printf 'unhashable')"
     done < <(git -C "${root}" ls-files -o --exclude-standard -z 2>/dev/null)
-  } | "${hasher}" | awk '{print $1}'
+  } | LC_ALL=C sort | "${hasher}" | awk '{print $1}'
 }
 
 tree_fingerprint_of() {

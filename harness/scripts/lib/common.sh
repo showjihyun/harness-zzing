@@ -151,27 +151,49 @@ now_iso() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 # git 저장소가 아니거나 해시 도구가 없으면 빈 문자열을 냅니다. 그 환경에서는
 # 신선도를 판정하지 않습니다(판정할 근거가 없는 것을 통과로도 실패로도 쓰지 않습니다).
 harness_tree_fingerprint() {
-  local root="${1:-$PWD}" hasher="" h="" f=""
+  local root="${1:-$PWD}" hasher="" h="" p="" line="" meta="" blob=""
   git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
   for h in sha1sum shasum md5sum cksum; do
     if command -v "$h" >/dev/null 2>&1; then hasher="$h"; break; fi
   done
   [[ -n "$hasher" ]] || return 0
+
+  # 작업 트리에 **실제로 존재하는 파일의 내용**만 해시합니다. HEAD 를 쓰지 않습니다.
+  #
+  # HEAD 기준 표현(rev-parse HEAD, status --porcelain, diff HEAD)을 쓰면 커밋만
+  # 해도 값이 달라집니다. 커밋 전은 HEAD=A + M 목록 + 변경 내용, 커밋 후는
+  # HEAD=B + 빈 status + 빈 diff 입니다. 파일 내용은 같은데 표현이 달라져,
+  # 검증 → 커밋 → 종료 라는 정상 순서가 항상 차단되었습니다.
+  # git add 도 같은 이유로 값을 바꿨습니다.
+  # 근거: improvement-log/2026-09-05-003.
+  #
+  # index 해시를 뼈대로 쓰고, 작업 트리가 index 와 다른 파일만 실제 내용을 해시합니다.
+  # index 는 커밋으로 바뀌지 않으므로 이 뼈대 자체가 커밋 불변입니다.
+  # 존재하지 않는 경로(삭제됨)는 아예 내보내지 않습니다. 그래야 삭제를 stage 해도
+  # 값이 같습니다. 삭제 자체는 줄이 사라지는 것으로 드러납니다.
+  local -A _dirty=()
+  while IFS= read -r -d '' p; do _dirty["$p"]=1; done \
+    < <(git -C "$root" diff --name-only -z 2>/dev/null)
+
   {
-    git -C "$root" rev-parse HEAD 2>/dev/null || printf 'no-head\n'
-    # 경로와 상태 문자만으로는 부족합니다. 이미 더티한 파일을 다시 고치면
-    # porcelain 출력이 " M path" 그대로여서 지문이 변하지 않고, 검증한 뒤 같은
-    # 파일을 또 고치고 종료하는 경우 — 이 게이트가 막으려던 바로 그 경우 —
-    # 를 놓칩니다. 그래서 **내용**을 함께 넣습니다.
-    git -C "$root" status --porcelain 2>/dev/null || true
-    # 추적 파일의 실제 변경 내용 (스테이지된 것과 아닌 것 모두).
-    git -C "$root" diff HEAD 2>/dev/null || true
-    # 미추적 파일은 diff 에 안 나오므로 경로와 내용 해시를 따로 붙입니다.
-    while IFS= read -r -d '' f; do
-      printf '%s ' "$f"
-      git -C "$root" hash-object -- "$root/$f" 2>/dev/null || printf 'unhashable\n'
+    while IFS= read -r -d '' line; do
+      # "<mode> <blob> <stage>\t<path>"
+      meta="${line%%$'\t'*}"
+      p="${line#*$'\t'}"
+      [[ -f "${root}/${p}" ]] || continue
+      if [[ -n "${_dirty[$p]:-}" ]]; then
+        blob="$(git -C "$root" hash-object -- "${root}/${p}" 2>/dev/null || printf 'unhashable')"
+      else
+        blob="${meta#* }"; blob="${blob%% *}"
+      fi
+      printf '%s %s\n' "$p" "$blob"
+    done < <(git -C "$root" ls-files -s -z 2>/dev/null)
+
+    while IFS= read -r -d '' p; do
+      [[ -f "${root}/${p}" ]] || continue
+      printf '%s %s\n' "$p" "$(git -C "$root" hash-object -- "${root}/${p}" 2>/dev/null || printf 'unhashable')"
     done < <(git -C "$root" ls-files -o --exclude-standard -z 2>/dev/null)
-  } | "$hasher" | awk '{print $1}'
+  } | LC_ALL=C sort | "$hasher" | awk '{print $1}'
 }
 
 # --- 설정 ---------------------------------------------------------------------
