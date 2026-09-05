@@ -35,7 +35,7 @@ Android 는 아직 별도 kind 로 다루지 않습니다. 필요해지면 `Andr
 | gradle | `integration` | `correctness` | true | `./gradlew --console=plain integrationTest` | `src/integrationTest/` 또는 `src/intTest/` 가 있을 때 |
 | maven | `compile` | `correctness` | true | `./mvnw -B -q compile` | 항상 |
 | maven | `test` | `correctness` | true | `./mvnw -B test` | 항상 |
-| maven | `verify` | `architecture` | false | `./mvnw -B -DskipTests verify` | 항상 (failsafe·checkstyle·spotbugs 가 `verify` 에 묶여 있을 때) |
+| maven | `verify` | `architecture` | false | `./mvnw -B -Dsurefire.skip=true verify` | 항상 (failsafe·checkstyle·spotbugs 가 `verify` 에 묶여 있을 때). surefire 만 끕니다. `-DskipTests` 는 failsafe 까지 꺼서 통합 테스트가 돌지 않습니다 |
 
 명령의 `./gradlew`·`./mvnw` 접두사는 래퍼가 있을 때이고, 없으면 `gradle`·`mvn` 으로 바뀝니다. 실제 생성 결과는 `harness/scripts/verify.sh --list` 로 확인하십시오.
 

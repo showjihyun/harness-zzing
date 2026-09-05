@@ -36,7 +36,7 @@ Python 백엔드(웹 서버, 배치, CLI, 데이터 파이프라인) 프로젝�
 | `typecheck` | `quality` | false | `mypy .` | `mypy.ini`, `.mypy.ini` 또는 `[tool.mypy]` |
 | `typecheck` | `quality` | false | `pyright` | mypy 설정이 없고 `pyrightconfig.json` 또는 `[tool.pyright]` 가 있을 때 |
 | `arch-test` | `architecture` | true | `lint-imports` | `.importlinter` 또는 `[tool.importlinter]` |
-| `test` | `correctness` | true | `pytest -q` | 항상 |
+| `test` | `correctness` | true | `pytest -q` | `tests/` 또는 `test/` 가 있거나, `pytest.ini`·`tox.ini`·`setup.cfg`·`[tool.pytest.ini_options]` 가 있을 때 |
 
 통합 테스트를 `pytest -m integration` 으로 분리하거나 부하 테스트를 붙이려면 [backend/harness.config.example](backend/harness.config.example) 을 씁니다.
 

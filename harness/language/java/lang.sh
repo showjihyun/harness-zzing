@@ -34,14 +34,18 @@ harness_lang_java_kind() {
 
 # --- 명령 접두사 ----------------------------------------------------------------
 # gradlew / mvnw 래퍼가 있으면 래퍼를 씁니다. 래퍼가 정본 버전을 고정하기 때문입니다.
+# 존재(-f)로 판정하고 실행 권한(-x)으로 판정하지 않습니다. 실행 비트를 잃은 체크아웃에서
+# -x 는 거짓이 되어 전역 gradle/mvn 으로 조용히 폴백하고, 래퍼가 고정한 것과 다른 버전으로
+# 빌드됩니다. 그러면 verify 결과가 CI 결과와 대응하지 않습니다. 래퍼가 있는데 실행되지 않으면
+# 그 자리에서 실패하는 편이 낫습니다. 원인과 조치가 드러납니다.
 harness_lang_java_gradle_cmd() {
   local root="$1"
-  if [[ -x "$root/gradlew" ]]; then printf './gradlew --console=plain'; else printf 'gradle --console=plain'; fi
+  if [[ -f "$root/gradlew" ]]; then printf './gradlew --console=plain'; else printf 'gradle --console=plain'; fi
 }
 
 harness_lang_java_maven_cmd() {
   local root="$1"
-  if [[ -x "$root/mvnw" ]]; then printf './mvnw -B'; else printf 'mvn -B'; fi
+  if [[ -f "$root/mvnw" ]]; then printf './mvnw -B'; else printf 'mvn -B'; fi
 }
 
 # --- 기본 verify 단계 -------------------------------------------------------------
@@ -68,7 +72,10 @@ harness_lang_java_default_steps() {
       _emit_step compile correctness true "${m} -q compile"
       _emit_step test correctness true "${m} test"
       # verify 는 failsafe(통합 테스트)·checkstyle·spotbugs 를 묶어 실행합니다.
-      _emit_step verify architecture false "${m} -DskipTests verify"
+      # surefire 만 끕니다. 위 test 단계에서 이미 돌았기 때문입니다.
+      # -DskipTests 를 쓰면 failsafe 까지 꺼져 통합 테스트가 하나도 돌지 않은 채
+      # architecture 계층이 통과로 채점됩니다. 주석과 실제 동작이 반대가 됩니다.
+      _emit_step verify architecture false "${m} -Dsurefire.skip=true verify"
       ;;
     *)
       : # 알 수 없는 변형 — 단계 없음

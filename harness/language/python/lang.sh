@@ -86,7 +86,16 @@ harness_lang_python_default_steps() {
     _emit_step arch-test architecture true "${p}lint-imports"
   fi
 
-  _emit_step test correctness true "${p}pytest -q"
+  # 테스트 단계도 다른 단계와 같은 규약을 따릅니다. "있으면 실행되는" 것만 냅니다.
+  # 무조건 내면 테스트가 아직 없는 저장소에서 pytest 가 exit 5(수집된 테스트 없음),
+  # 미설치 환경에서 exit 127 을 내고, required=true 라 첫 verify 가 그 자리에서
+  # 멈춥니다. go 의 go test ./... 나 rust 의 cargo test 는 테스트가 없어도 0 이라
+  # 무조건 내도 무해하지만 pytest 는 그렇지 않습니다.
+  if [[ -d "$root/tests" || -d "$root/test" ]] \
+    || [[ -f "$root/pytest.ini" || -f "$root/tox.ini" || -f "$root/setup.cfg" ]] \
+    || harness_lang_python_has_tool_section "$root" pytest; then
+    _emit_step test correctness true "${p}pytest -q"
+  fi
 }
 
 # --- 보호 패턴 -----------------------------------------------------------------
