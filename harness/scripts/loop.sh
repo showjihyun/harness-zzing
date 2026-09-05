@@ -30,7 +30,7 @@ usage() {
   - 최대 반복 횟수 도달                      → max_iterations
   - 동일 실패 서명 HARNESS_MAX_SAME_FAILURE 회 → same_failure
   - HARNESS_NO_IMPROVEMENT_ROUNDS 라운드 연속 개선 없음 → no_improvement
-  - 보안 민감 파일 변경 감지                  → security_review (사람 검토로 에스컬레이션)
+  - 루프 시작 이후 보안 민감 파일 변경 감지    → security_review (사람 검토로 에스컬레이션)
   - 시간 예산(HARNESS_MAX_SECONDS) 초과       → budget_exceeded
 
 HARNESS_AGENT_CMD 가 비어 있으면 자동으로 dry-run 으로 동작합니다.
@@ -88,7 +88,12 @@ fi
 # harness/language/<언어>/lang.sh 의 HARNESS_LANG_<언어>_SECURITY_PATTERNS 가 덧붙입니다.
 # 보호 목록과 같은 이유로 감지 결과에 의존하지 않고 모든 팩의 패턴을 합칩니다.
 # monorepo 에서 루트가 한 언어만 가리켜도 다른 언어의 자격 증명 변경을 놓치지 않기 위해서입니다.
-SECURITY_PATTERNS='(^|/)(\.env|\.env\.[^/]+|id_rsa|id_ed25519)|secret|credential|password|token|auth|crypto|security|permission|iam|\.pem$|\.key$'
+# 키워드는 경로 성분 경계에 붙여 판정합니다. 경계 없이 부분 문자열로 두면
+# docs/authoring.md, AUTHORS, Miami.md 같은 무관한 경로가 auth·iam 에 걸려
+# 루프가 보안 검토로 중단됩니다. 뒤의 s? 는 permissions.ts, secrets.yaml 처럼
+# 흔한 복수형을 살리기 위한 것입니다.
+SECURITY_KEYWORDS='secret|credential|password|token|auth|crypto|security|permission|iam'
+SECURITY_PATTERNS="(^|/)(\.env|\.env\.[^/]+|id_rsa|id_ed25519)|(^|[^a-z0-9])(${SECURITY_KEYWORDS})s?([^a-z0-9]|$)|\.pem$|\.key$"
 harness_lang_load_packs || true
 LANG_SECURITY="$(lang_all_security_patterns)"
 [[ -z "$LANG_SECURITY" ]] || SECURITY_PATTERNS="${SECURITY_PATTERNS}|${LANG_SECURITY}"
@@ -202,13 +207,29 @@ $(failing_step_report)
 PROMPT
 }
 
+# 루프 시작 시점의 더티 목록. 이 시점에 이미 바뀌어 있던 파일은 에이전트가 만든
+# 변경이 아니므로 판정에서 제외합니다. 제외하지 않으면 루프를 돌리기 전부터 열려
+# 있던 무관한 편집을 에이전트 탓으로 돌려 1라운드에서 곧바로 중단됩니다.
+dirty_paths() {
+  git -C "$ROOT" status --porcelain 2>/dev/null | sed 's/^...//' | sort -u || true
+}
+SECURITY_BASELINE=""
+if have_cmd git && git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  SECURITY_BASELINE="$(dirty_paths)"
+fi
+SECURITY_MATCHED=""
+
 security_sensitive_change() {
   have_cmd git || return 1
   git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 1
-  local changed
-  changed="$(git -C "$ROOT" status --porcelain 2>/dev/null | sed 's/^...//' || true)"
-  [[ -n "$changed" ]] || return 1
-  printf '%s\n' "$changed" | grep -Eqi "$SECURITY_PATTERNS"
+  local now new
+  now="$(dirty_paths)"
+  [[ -n "$now" ]] || return 1
+  # 시작 시점 이후에 새로 나타난 경로만 봅니다.
+  new="$(comm -13 <(printf '%s\n' "$SECURITY_BASELINE") <(printf '%s\n' "$now") 2>/dev/null || printf '%s\n' "$now")"
+  [[ -n "$new" ]] || return 1
+  SECURITY_MATCHED="$(printf '%s\n' "$new" | grep -Ei "$SECURITY_PATTERNS" || true)"
+  [[ -n "$SECURITY_MATCHED" ]]
 }
 
 printf '%s\n' "self-improving loop 를 시작합니다."
@@ -328,7 +349,9 @@ case "$STOPPED_REASON" in
     printf '%s\n' "최고 점수: ${BEST_SCORE}. 문제를 더 작게 쪼개거나 평가 증거를 보강하십시오." ;;
   security_review)
     printf '%s\n' "종료 사유: 보안 민감 파일 변경이 감지되었습니다. 사람 검토로 에스컬레이션합니다."
-    printf '%s\n' "변경 목록을 직접 확인하십시오: git status --porcelain" ;;
+    printf '%s\n' "걸린 경로 (루프 시작 이후 새로 바뀐 것만):"
+    printf '%s\n' "${SECURITY_MATCHED}" | sed 's/^/  /'
+    printf '%s\n' "전체 변경은 git status --porcelain 으로 확인하십시오." ;;
   budget_exceeded)
     printf '%s\n' "종료 사유: 시간 예산 ${MAX_SECONDS}초를 초과했습니다." ;;
   max_iterations)
