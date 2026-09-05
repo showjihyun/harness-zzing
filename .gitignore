@@ -3,6 +3,9 @@
 .harness/latest-eval.json
 .harness/loop-state.json
 .harness/baseline-eval.json
+.harness/guard-events.log
+.harness/guard-snapshot.tsv
+.harness/guard-patterns.cache
 .harness/logs/
 
 # 로컬 설정 오버라이드

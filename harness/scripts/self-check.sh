@@ -152,7 +152,13 @@ if selected protection; then
     else
       # 대표 패턴 몇 개가 실제로 차단되는지 확인합니다.
       miss=""
-      for p in tsconfig.json checkstyle.xml ruff.toml .golangci.yml clippy.toml; do
+      # 파일명 패턴과 **경로 패턴**을 함께 봅니다. 파일명만 보면 to_relative 나 경로
+      # 일치 규칙이 깨져도 이 검사가 통과합니다. 실제로 보호 목록을 hooks/lib/guard-lib.sh
+      # 로 옮길 때 to_relative 의 이스케이프가 깨져 경로에서 "/" 를 전부 지웠고,
+      # harness/scripts/*.sh 를 포함한 모든 경로 패턴이 빗나갔는데 이 검사는 통과했습니다.
+      # 파일명 탐침만으로는 죽은 단언이 됩니다.
+      for p in tsconfig.json checkstyle.xml ruff.toml .golangci.yml clippy.toml \
+               harness/scripts/verify.sh harness/rules/RULES.md .harness/verify.json; do
         c=0
         printf '{"tool_input":{"file_path":"%s"}}' "$p" \
           | CLAUDE_PROJECT_DIR="${empty_dir}" bash "$guard" >/dev/null 2>&1 || c=$?
