@@ -62,11 +62,20 @@ if [[ "$OPT_REUSE" -eq 1 ]]; then
   say "기존 ${HARNESS_VERIFY_JSON} 을 재사용합니다."
 else
   say "verify.sh 를 실행합니다."
+  _rc=0
   if [[ "$OPT_JSON" -eq 1 ]]; then
-    "${SCRIPT_DIR}/verify.sh" >/dev/null 2>&1 || true
+    "${SCRIPT_DIR}/verify.sh" >/dev/null 2>&1 || _rc=$?
   else
-    "${SCRIPT_DIR}/verify.sh" || true
+    "${SCRIPT_DIR}/verify.sh" || _rc=$?
   fi
+  # verify.sh 의 규약: 0 = 필수 전부 통과, 1 = 필수 실패. 둘 다 채점 가능한 결과를 남깁니다.
+  # 그 밖(3 단계 정의 오류, 126 실행 권한 없음, 127 명령 없음, 시그널)은 이번 실행이
+  # 결과를 남기지 못했다는 뜻입니다. 예전에는 || true 로 삼키고 파일 존재만 확인해서
+  # **실행되지 않은 라운드의 낡은 점수**를 이번 결과로 보고했습니다.
+  case "$_rc" in
+    0|1) ;;
+    *) die "verify.sh 가 exit ${_rc} 로 끝나 이번 실행의 결과를 남기지 못했습니다. 낡은 ${HARNESS_VERIFY_JSON} 은 채점하지 않습니다." 3 ;;
+  esac
   [[ -f "$VERIFY_FILE" ]] || die "verify.sh 가 ${HARNESS_VERIFY_JSON} 을 만들지 못했습니다." 3
 fi
 
