@@ -363,6 +363,9 @@ UT ▸ EI ▸ LB ▸ PG ▸ CC ▸ LP ▸ CX ▸ GC
 | --- | --- | --- |
 | [`stop-verify-gate.sh`](harness/hooks/stop-verify-gate.sh) | Stop | 에이전트가 "다 했습니다"라고 선언하는 순간 `.harness/verify.json` 을 확인합니다. 검증이 실행되지 않았거나 `status` 가 `pass` 가 아니면 종료를 차단하고, 무엇이 실패했는지와 다음 조치를 stderr 로 돌려줍니다. |
 | [`guard-evaluation-tampering.sh`](harness/hooks/guard-evaluation-tampering.sh) | PreToolUse | 평가·게이트 규정 파일의 변경을 차단합니다. |
+| [`detect-guarded-change.sh`](harness/hooks/detect-guarded-change.sh) | PostToolUse | 보호 파일이 실제로 바뀌었는지 내용 해시로 사후 검출하고 `.harness/guard-events.log` 에 남깁니다. 막지는 않습니다. |
+
+**로컬 hook 은 우회를 다 막지 못합니다.** 에이전트가 도는 곳에서 돌기 때문입니다. 명령 열거는 닫히지 않고(`cp` 를 막으면 `mv` 가 남습니다), 쓰기가 hook 이 읽을 수 없는 프로그램 안에서 일어날 수 있으며, hook 을 등록하는 파일을 고치면 hook 자체가 사라집니다. 그래서 무결성 보장은 저장소 밖에 둡니다. [`.github/workflows/harness.yml`](.github/workflows/harness.yml) 이 깨끗한 체크아웃에서 `verify.sh` 를 돌리고, 보호 파일이 바뀐 PR 은 `harness-change` 라벨과 사람 검토 없이 통과하지 못하게 합니다. 한계와 설계 근거는 [harness/hooks/README.md](harness/hooks/README.md) 를 읽습니다.
 
 [`harness/hooks/settings.hooks.json`](harness/hooks/settings.hooks.json) 을 Claude Code `settings.json` 의 `hooks` 블록에 병합합니다. `HARNESS_SKIP_STOP_GATE=1` 은 stop 게이트를 우회하고 그 사실을 stderr 에 기록합니다. `stop_hook_active` 는 무한 루프를 막기 위해 즉시 통과시킵니다.
 
