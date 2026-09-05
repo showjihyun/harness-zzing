@@ -41,7 +41,7 @@ cp .harness/latest-eval.json .harness/baseline-eval.json   # 승격 판정 전 �
 harness/scripts/pass-threshold.sh
 ```
 
-위 명령은 **과제를 실행하지 않습니다.** `harness.config` 의 `HARNESS_STEPS`(이 저장소에서는 self-check 다섯 단계)만 집계해 하네스 자신이 성립하는지 판정합니다. `REP-*` 와 `HLD-*` 의 합격 기준은 사람이나 새 세션의 에이전트가 판정하고 [runs/](runs/) 에 과제 한 건당 한 파일로 남깁니다. 두 근거는 서로를 대체하지 않으며 승격 판정은 둘을 함께 봅니다.
+위 명령은 **과제를 실행하지 않습니다.** `harness.config` 의 `HARNESS_STEPS`(이 저장소에서는 self-check 단계 전부)만 집계해 하네스 자신이 성립하는지 판정합니다. `REP-*` 와 `HLD-*` 의 합격 기준은 사람이나 새 세션의 에이전트가 판정하고 [runs/](runs/) 에 과제 한 건당 한 파일로 남깁니다. 두 근거는 서로를 대체하지 않으며 승격 판정은 둘을 함께 봅니다.
 
 각 과제는 하네스를 처음 만나는 새 세션에서 실행합니다. 앞선 과제의 대화 맥락을 이어 실행하면 진입점 문서의 발견 여부를 측정할 수 없습니다.
 

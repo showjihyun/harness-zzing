@@ -7,7 +7,7 @@
 | 목적 | 명령 또는 문서 |
 | --- | --- |
 | 완료 선언 전 검증 | `./harness/scripts/verify.sh` → `.harness/verify.json` |
-| 하네스 자기 점검 | `./harness/scripts/self-check.sh` (verify 의 다섯 단계가 이것입니다) |
+| 하네스 자기 점검 | `./harness/scripts/self-check.sh` (verify 단계 전부가 이것입니다) |
 | 계층별 평가 | `./harness/scripts/eval.sh` → `.harness/latest-eval.json` |
 | 개선 후보 기록 | `./harness/scripts/improvement-log.sh new` → `improvement-log/` |
 | 보호 목록 확인 | `./harness/hooks/guard-evaluation-tampering.sh --list` |

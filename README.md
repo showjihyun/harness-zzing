@@ -276,6 +276,7 @@ shows up in a specific layer rather than as one opaque failure:
 | `protection` | behavior | Protection patterns are merged independently of stack detection. This is the repository's evaluation-integrity gate. |
 | `links` | quality | Every relative link in the documents resolves. A broken discovery path makes a document effectively absent. |
 | `log-schema` | quality | The bundle's shipped improvement-log examples satisfy the schema. |
+| `inventory` | quality | Every script in the bundle appears in the README file tree. |
 
 The pass line is `HARNESS_THRESHOLD=90` here. "Any failing step means failure" is not encoded in that number:
 `eval.sh` records `failed_required` and forces `pass: false` whenever a required step failed, whatever the score. Loop budget: 8 iterations max, 3 repeats of the same failure, 2 rounds without improvement.

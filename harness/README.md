@@ -50,10 +50,12 @@ harness/
     harness-evaluator.md
   scripts/
     verify.sh
+    self-check.sh
     eval.sh
     pass-threshold.sh
     loop.sh
     improvement-log.sh
+    protected-diff.sh
     lib/common.sh
     lib/detect-stack.sh
     harness.config.example
@@ -62,6 +64,8 @@ harness/
     settings.hooks.json
     stop-verify-gate.sh
     guard-evaluation-tampering.sh
+    detect-guarded-change.sh
+    lib/guard-lib.sh
   improvement-log/
     README.md
     schema.md
@@ -72,6 +76,7 @@ harness/
     rubric.md
     tasks/representative.md
     tasks/held-out.md
+    runs/_template.md
   templates/
     AGENTS.md
     CLAUDE.md
