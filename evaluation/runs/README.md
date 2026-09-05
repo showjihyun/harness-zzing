@@ -6,4 +6,6 @@
 
 형식은 [../../harness/evaluation/runs/_template.md](../../harness/evaluation/runs/_template.md) 를 따릅니다. 승격 판정에서 이 파일들이 하는 역할은 [../../harness/rules/promotion-gate.rule.md](../../harness/rules/promotion-gate.rule.md) 의 PG-3, PG-6 입니다.
 
+`_` 로 시작하는 파일은 task 실행 기록이 아니라 세트 운용에 필요한 부속 문서입니다. 현재 [_worktree-findings.md](_worktree-findings.md) 하나가 있으며, 에이전트 워크트리에 미기록으로 남아 있던 평가 흔적과 그중 무엇이 판정 근거가 되는지를 담습니다.
+
 기록이 없다면 그것은 "회귀가 없다" 는 뜻이 아니라 **판정하지 않았다** 는 뜻입니다. 그 상태에서는 candidate 를 `promoted` 로 올리지 않습니다.
