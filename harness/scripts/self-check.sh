@@ -28,7 +28,7 @@ usage() {
 하네스 번들 자신의 무결성을 검사합니다. 대상 프로젝트의 코드는 보지 않습니다.
 
 검사 항목:
-  syntax      번들의 모든 bash 스크립트가 파싱되는가
+  syntax      번들의 모든 bash 스크립트가 파싱되고 진입점에 실행 비트가 있는가
   packs       언어 팩이 하나 이상 로드되고 전부 계약을 지키는가
   protection  보호 패턴이 감지와 무관하게 모든 팩의 합집합으로 병합되는가
   links       번들 안 마크다운의 상대 링크가 전부 실재하는가
@@ -81,10 +81,29 @@ if selected syntax; then
   while IFS= read -r f; do
     bash -n "$f" 2>/dev/null || bad="${bad} ${f#"${HARNESS_DIR}/"}"
   done < <(find "${HARNESS_DIR}" -name '*.sh' -type f)
-  if [[ -z "$bad" ]]; then
-    report_pass syntax "번들의 모든 bash 스크립트가 파싱됩니다"
-  else
+
+  # 직접 실행되는 진입점은 git 인덱스에 실행 비트를 가져야 합니다.
+  # 작업 트리 권한이 아니라 인덱스를 보는 이유: core.fileMode=false 인 환경(Windows)에서는
+  # 작업 트리가 항상 실행 가능해 보이지만 인덱스에는 100644 로 들어가고, 그 상태로 clone 한
+  # 쪽에서 hook 과 verify 진입점이 exit 126 으로 죽습니다. 126 은 0 도 2 도 아니므로
+  # stop 게이트와 평가 가드가 "차단 없음"으로 읽혀 조용히 사라집니다.
+  # scripts/ 와 hooks/ 의 depth 1 만 봅니다. lib/ 와 language/ 의 팩은 source 전용입니다.
+  noexec=""
+  if git -C "${HARNESS_PROJECT_ROOT_RESOLVED}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    while IFS= read -r f; do
+      rel="${f#"${HARNESS_PROJECT_ROOT_RESOLVED}/"}"
+      mode="$(git -C "${HARNESS_PROJECT_ROOT_RESOLVED}" ls-files -s -- "$rel" 2>/dev/null | awk '{print $1}')"
+      [[ -z "$mode" ]] && continue   # 아직 추적되지 않는 파일은 판정하지 않습니다
+      [[ "$mode" == "100755" ]] || noexec="${noexec} ${rel}"
+    done < <(find "${HARNESS_DIR}/scripts" "${HARNESS_DIR}/hooks" -maxdepth 1 -name '*.sh' -type f)
+  fi
+
+  if [[ -n "$bad" ]]; then
     report_fail syntax "파싱 실패:${bad}"
+  elif [[ -n "$noexec" ]]; then
+    report_fail syntax "git 인덱스에 실행 비트가 없습니다(clone 하면 exit 126):${noexec} — git update-index --chmod=+x 로 고칩니다"
+  else
+    report_pass syntax "모든 bash 스크립트가 파싱되고 진입점에 실행 비트가 있습니다"
   fi
 fi
 
