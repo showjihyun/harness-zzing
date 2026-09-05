@@ -39,7 +39,7 @@ layer_score = round( passed_steps / total_steps * 100 )
 score = round( Σ ( layer_weight × layer_score ) )
 ```
 
-가중치 합계는 항상 `1.00` 입니다. 총점이 `threshold` 이상이면 `pass: true` 입니다. 임계값 기본값은 `HARNESS_THRESHOLD=80` 이며, 판정은 `harness/scripts/pass-threshold.sh` 로 합니다.
+가중치 합계는 항상 `1.00` 입니다. 총점이 `threshold` 이상이고 **필수 단계 실패가 0건일 때만** `pass: true` 입니다. 필수 단계가 하나라도 실패하면 총점과 무관하게 `pass: false` 이며(EV-5), 그 사실은 `.harness/latest-eval.json` 의 `failed_required` 에 기록됩니다. 임계값 기본값은 `HARNESS_THRESHOLD=80` 이며, 판정은 `harness/scripts/pass-threshold.sh` 로 합니다.
 
 **총점만으로 판정하지 않습니다.** 총점이 올라도 어느 계층 점수가 기준선보다 낮으면 회귀입니다.
 
@@ -132,6 +132,7 @@ subjective_score = round( Σ S1..S5 / 20 * 100 )
   "score": 84,
   "threshold": 80,
   "pass": true,
+  "failed_required": 0,
   "largest_failure": {"layer": "behavior", "detail": "결제 버튼 클릭 후 console TypeError 1건. 재현: harness/scripts/verify.sh 후 harness/scripts/eval.sh --reuse, 근거 .harness/logs/behavior.log:118"}
 }
 ```
@@ -143,6 +144,7 @@ subjective_score = round( Σ S1..S5 / 20 * 100 )
 - `deterministic` 은 `subjective` 만 `false` 입니다.
 - `evidence` 는 실제로 존재하는 파일 경로입니다. 경로를 지어내지 않습니다.
 - `subjective` 의 `notes` 에는 항목별 원점수(`S1..S5`)를 남깁니다. 환산 점수만 남기면 재검토가 불가능합니다.
+- `failed_required` 는 `.harness/verify.json` 의 같은 키를 그대로 옮긴 값입니다. 0 이 아니면 `score` 와 무관하게 `pass` 는 `false` 입니다(EV-5).
 - `largest_failure` 에는 가장 큰 실패 하나만 적고, `detail` 에 재현 명령과 근거 경로를 포함합니다. 실패가 없으면 `detail` 을 빈 문자열로 둡니다.
 
 승격 판정에 쓸 때는 이 파일을 기준선과 함께 보관하고, 대표·held-out task ID 와 변경 전후 점수를 improvement log 항목의 `regression_check` 에 옮겨 적습니다([../improvement-log/schema.md](../improvement-log/schema.md)).

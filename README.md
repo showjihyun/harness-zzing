@@ -277,8 +277,8 @@ shows up in a specific layer rather than as one opaque failure:
 | `links` | quality | Every relative link in the documents resolves. A broken discovery path makes a document effectively absent. |
 | `log-schema` | quality | The bundle's shipped improvement-log examples satisfy the schema. |
 
-The pass line is `HARNESS_THRESHOLD=90` here, set so that a single failing step drops the total below
-it. Loop budget: 8 iterations max, 3 repeats of the same failure, 2 rounds without improvement.
+The pass line is `HARNESS_THRESHOLD=90` here. "Any failing step means failure" is not encoded in that number:
+`eval.sh` records `failed_required` and forces `pass: false` whenever a required step failed, whatever the score. Loop budget: 8 iterations max, 3 repeats of the same failure, 2 rounds without improvement.
 
 **Do not weaken a gate to make it pass.** Deleting a check, disabling it, adding a skip comment or
 extending an exception list is not a fix — that is `EI` territory, and it is the rule namespace with

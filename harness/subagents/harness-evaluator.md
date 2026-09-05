@@ -54,6 +54,7 @@ model: inherit
   "score": 81,
   "threshold": 80,
   "pass": true,
+  "failed_required": 0,
   "largest_failure": {"layer": "behavior", "detail": "..."}
 }
 ```
@@ -61,7 +62,7 @@ model: inherit
 - 위 예시는 `layers` 를 한 계층만 발췌한 것입니다. 실제 파일에는 6개 계층을 모두 적고, 실행하지 못한 계층도 배열에서 빼지 않습니다.
 - `score` 는 0~100 정수이며 가중 평균을 반올림한 값입니다.
 - `deterministic` 이 `true` 인 계층은 `evidence` 가 비어 있을 수 없습니다.
-- `pass` 는 `score >= threshold` 이며, 아래 게이트 규칙을 함께 만족해야 합니다.
+- `pass` 는 `score >= threshold` 이며, 아래 게이트 규칙을 함께 만족해야 합니다. EV-5 는 [../scripts/eval.sh](../scripts/eval.sh) 가 `failed_required` 키로 강제하고, [../scripts/pass-threshold.sh](../scripts/pass-threshold.sh) 가 같은 키로 판정합니다.
 
 ## 판정 게이트
 

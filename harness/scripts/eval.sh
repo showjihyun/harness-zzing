@@ -24,6 +24,7 @@ performance, subjective 6개 계층으로 집계해 .harness/latest-eval.json �
   계층 점수 = (그 계층의 통과 단계 수 / 그 계층의 단계 수) * 100
   단계가 하나도 없는 계층은 score 가 null 이고, 그 가중치는 나머지 계층에 비례 재분배합니다.
   최종 score 는 계층 점수의 가중 평균을 반올림한 0~100 정수입니다.
+  필수 단계가 하나라도 실패하면 score 와 무관하게 pass 는 false 입니다 (EV-5).
 
 종료 코드:
   0  계산에 성공했습니다. (합격 여부는 pass 필드와 pass-threshold.sh 로 판정합니다)
@@ -219,10 +220,21 @@ SCORE=$(( (WEIGHTED_SUM + 500) / 1000 ))
 [[ "$SCORE" -le 100 ]] || SCORE=100
 [[ "$SCORE" -ge 0 ]] || SCORE=0
 
+# 필수 단계 실패는 점수보다 앞섭니다. subagents/harness-evaluator.md 의 EV-5 가 이미
+# "총점이 임계값을 넘어도 필수 결정론 계층이 실패했으면 pass 는 false" 라고 규정했는데
+# 구현에는 그 조건이 없었습니다. 총점만으로 판정하면 계층 분포에 따라 필수 실패가
+# 합격선 위에 남습니다. 예를 들어 quality 가 3단계가 되고 그중 하나가 실패하면
+# 총점은 92 로 계산되어 threshold 90 을 넘지만 verify 는 status:fail 입니다.
+# 합격선이라는 숫자가 "한 단계라도 실패하면 불합격" 이라는 불리언을 대신 표현하고 있었고,
+# 단계 구성이 바뀌는 순간 그 대체는 깨집니다. 불리언은 불리언으로 판정합니다.
+FAILED_REQUIRED_COUNT="$(json_num_field "$(tr '\n' ' ' < "$VERIFY_FILE")" failed_required)"
+[[ "$FAILED_REQUIRED_COUNT" =~ ^[0-9]+$ ]] \
+  || die "${HARNESS_VERIFY_JSON} 에서 failed_required 를 읽지 못했습니다. harness.verify/1 형식이 아닙니다. verify.sh 를 다시 실행하십시오." 3
+
 THRESHOLD="${OPT_THRESHOLD:-${HARNESS_THRESHOLD:-80}}"
 [[ "$THRESHOLD" =~ ^[0-9]+$ ]] || die "threshold 가 정수가 아닙니다: ${THRESHOLD}" 3
 
-if [[ "$SCORE" -ge "$THRESHOLD" ]]; then PASS="true"; else PASS="false"; fi
+if [[ "$SCORE" -ge "$THRESHOLD" && "$FAILED_REQUIRED_COUNT" -eq 0 ]]; then PASS="true"; else PASS="false"; fi
 
 if [[ -n "$LARGEST_LAYER" ]]; then
   failed_list="${L_FAILED[$LARGEST_LAYER]}"
@@ -242,6 +254,7 @@ fi
   printf '  "score": %s,\n' "$SCORE"
   printf '  "threshold": %s,\n' "$THRESHOLD"
   printf '  "pass": %s,\n' "$PASS"
+  printf '  "failed_required": %s,\n' "$FAILED_REQUIRED_COUNT"
   printf '  "layers": [\n'
   printf '%s' "$LAYERS_JSON"
   printf '  ],\n'
@@ -270,6 +283,9 @@ for layer in "${HARNESS_LAYERS[@]}"; do
 done
 say ""
 say "총점: ${SCORE} / 합격선: ${THRESHOLD} / 합격 여부: ${PASS}"
+if [[ "$FAILED_REQUIRED_COUNT" -gt 0 ]]; then
+  say "필수 단계 ${FAILED_REQUIRED_COUNT}건이 실패했습니다. 총점과 무관하게 불합격입니다 (EV-5)."
+fi
 if [[ -n "$LARGEST_LAYER" ]]; then
   say "가장 큰 실패 계층: ${LARGEST_LAYER} (실패 단계: ${L_FAILED[$LARGEST_LAYER]:-없음})"
 fi
