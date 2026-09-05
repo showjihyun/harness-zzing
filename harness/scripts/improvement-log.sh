@@ -413,7 +413,12 @@ cmd_set_status() {
     !done && /^status:/ { print "status: " new; done = 1; next }
     { print }
   ' "$file" > "$tmp"
-  mv "$tmp" "$file"
+  # mv 로 갈아끼우면 mktemp 의 0600 이 원본의 0644 를 대체합니다. 공유 체크아웃이나
+  # 다른 uid 로 도는 CI 에서는 그 뒤의 validate·list 가 파일을 읽지 못하고,
+  # 필수 단계 log-schema 가 상태 전이 한 번으로 조용히 깨집니다.
+  # 내용만 덮어써 원본의 모드와 소유권을 유지합니다.
+  cat "$tmp" > "$file"
+  rm -f "$tmp"
   printf '%s\n' "${id}: ${current} → ${new_status}"
 }
 

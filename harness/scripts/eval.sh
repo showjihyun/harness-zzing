@@ -234,14 +234,17 @@ else
 fi
 
 {
+  # 최상위 스칼라를 배열보다 **먼저** 씁니다. lib/common.sh 의 json_num_field 는
+  # 첫 일치를 내므로, layers 가 앞에 오면 계층의 score 를 최상위 score 로 읽습니다.
+  # verify.json 도 같은 순서(스칼라 → steps 배열)입니다. 이 순서를 바꾸지 마십시오.
   printf '{\n'
   printf '  "schema": "harness.eval/1",\n'
-  printf '  "layers": [\n'
-  printf '%s' "$LAYERS_JSON"
-  printf '  ],\n'
   printf '  "score": %s,\n' "$SCORE"
   printf '  "threshold": %s,\n' "$THRESHOLD"
   printf '  "pass": %s,\n' "$PASS"
+  printf '  "layers": [\n'
+  printf '%s' "$LAYERS_JSON"
+  printf '  ],\n'
   printf '  "largest_failure": %s\n' "$LARGEST_JSON"
   printf '}\n'
 } > "${ROOT}/${HARNESS_EVAL_JSON}"

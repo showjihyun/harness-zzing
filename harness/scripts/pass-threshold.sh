@@ -63,10 +63,18 @@ if [[ ! "$SCORE" =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 
-THRESHOLD="${OPT_THRESHOLD:-}"
-[[ -n "$THRESHOLD" ]] || THRESHOLD="$FILE_THRESHOLD"
-[[ "$THRESHOLD" =~ ^[0-9]+$ ]] || THRESHOLD="${HARNESS_THRESHOLD:-80}"
-[[ "$THRESHOLD" =~ ^[0-9]+$ ]] || die "threshold 가 정수가 아닙니다: ${THRESHOLD}" 2
+# 명시적으로 받은 --threshold 가 정수가 아니면 조용히 버리지 않고 실패합니다.
+# 예전에는 파일 값이나 기본값으로 대체해서, `--threshold 9O`(문자 O)를 준 호출자가
+# 자기가 적은 값으로 게이트했다고 믿게 되었습니다. eval.sh 는 같은 입력에 die 하므로
+# 두 스크립트가 "잘못된 --threshold" 의 의미에 대해 서로 다르게 답하고 있었습니다.
+if [[ -n "${OPT_THRESHOLD}" ]]; then
+  [[ "$OPT_THRESHOLD" =~ ^[0-9]+$ ]] || die "--threshold 가 정수가 아닙니다: ${OPT_THRESHOLD}" 2
+  THRESHOLD="$OPT_THRESHOLD"
+else
+  THRESHOLD="$FILE_THRESHOLD"
+  [[ "$THRESHOLD" =~ ^[0-9]+$ ]] || THRESHOLD="${HARNESS_THRESHOLD:-80}"
+  [[ "$THRESHOLD" =~ ^[0-9]+$ ]] || die "threshold 가 정수가 아닙니다: ${THRESHOLD}" 2
+fi
 
 if [[ "$SCORE" -ge "$THRESHOLD" ]]; then
   say "합격: score ${SCORE} >= threshold ${THRESHOLD}"

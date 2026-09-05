@@ -80,18 +80,31 @@ json_escape() {
   printf '%s' "$s"
 }
 
-# json_str_field <json-조각> <키> — 문자열 값을 꺼냅니다. 없으면 빈 문자열입니다.
-# 파이프 조기 종료(SIGPIPE)로 pipefail 이 걸리지 않도록 변수로 받아 첫 줄만 씁니다.
+# json_str_field / json_num_field <json-조각> <키>
+#
+# **첫 번째** 일치를 냅니다. 이전 구현은 `sed -n "s/.*\"키\"...` 였는데, 앞의 `.*` 가
+# 탐욕적이라 같은 키가 여러 번 나오면 **마지막** 것을 냈습니다. latest-eval.json 에는
+# layers 배열 안에 "score" 가 6개, 최상위에 1개 있습니다. pass-threshold.sh 가 옳은
+# 값을 읽고 있었던 것은 eval.sh 가 우연히 layers 를 먼저 출력했기 때문일 뿐이고,
+# 출력 순서를 바꾸는 순간 subjective 계층의 score(대개 null)를 합격선과 비교하게 됩니다.
+#
+# 그래서 첫 일치로 고정하고, 최상위 스칼라를 배열보다 먼저 쓰도록 eval.sh 를 맞췄습니다.
+# 이 둘은 한 쌍입니다. 한쪽만 바꾸면 조용히 틀린 값을 읽습니다.
 json_str_field() {
   local out
-  out="$(printf '%s' "$1" | sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p")"
+  out="$(printf '%s' "$1" \
+    | grep -oE "\"$2\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" \
+    | head -n 1 \
+    | sed -E 's/^"[^"]*"[[:space:]]*:[[:space:]]*"//; s/"$//')"
   printf '%s' "${out%%$'\n'*}"
 }
 
-# json_num_field <json-조각> <키> — 숫자/불리언/null 값을 꺼냅니다.
 json_num_field() {
   local out
-  out="$(printf '%s' "$1" | sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\([-0-9.a-z]*\).*/\1/p")"
+  out="$(printf '%s' "$1" \
+    | grep -oE "\"$2\"[[:space:]]*:[[:space:]]*[-0-9.a-z]+" \
+    | head -n 1 \
+    | sed -E 's/^"[^"]*"[[:space:]]*:[[:space:]]*//')"
   printf '%s' "${out%%$'\n'*}"
 }
 
