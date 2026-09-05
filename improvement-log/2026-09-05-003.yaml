@@ -1,16 +1,16 @@
 # improvement log 후보입니다. improvement-log/schema.md 의 키 순서를 바꾸지 않습니다.
 id: 2026-09-05-003
 date: 2026-09-05
-status: candidate
+status: validating
 symptom: 커밋 직후 stop 게이트가 종료를 차단했습니다. 파일 내용은 하나도 바뀌지 않았고 git commit 이 HEAD 를 옮겼을 뿐인데 tree 지문이 달라졌습니다. 검증 → 커밋 → 종료 는 정상 작업 순서인데 그 순서로는 항상 차단됩니다.
 evidence: 2026-09-05 세션. 커밋 7223486 직후 stop-verify-gate.sh 가 '검증 이후 작업 트리가 바뀌었습니다 (당시 지문 ec1fa975b759, 현재 61b5d896990f)' 로 exit 2. 직전 verify 는 5단계 전부 통과였고 커밋과 verify 사이에 편집이 없었습니다. 지문 정의는 lib/common.sh 의 harness_tree_fingerprint.
 root_cause: 지문이 git rev-parse HEAD 와 git status --porcelain, git diff HEAD 를 함께 해시합니다. 셋 다 HEAD 를 기준으로 하므로 커밋 전후에 값이 전부 달라집니다. 커밋 전에는 HEAD=A, status 에 M 목록, diff 에 변경 내용이 있고, 커밋 후에는 HEAD=B, status 비어 있음, diff 비어 있음입니다. 작업 트리의 실제 내용은 동일한데 지문만 달라집니다. 지문이 '내용'이 아니라 '내용 + HEAD 기준 상대 표현'을 해시하고 있는 것이 원인입니다.
-fix: 이번에는 커밋 뒤 verify.sh 를 한 번 더 실행해 지문을 갱신하는 것으로 넘겼습니다. 이것은 우회이지 수정이 아닙니다. 사람이 매번 기억해야 하고, 기억하지 못하면 정상 작업이 차단됩니다. 근본 처방은 proposed_harness_change 에 적었습니다. 
+fix: harness_tree_fingerprint 를 커밋 불변으로 바꿨습니다. HEAD 기준 표현(rev-parse HEAD, status --porcelain, diff HEAD) 대신 작업 트리에 실제로 존재하는 파일의 "경로 + 내용 해시" 목록을 정렬해 해시합니다. 수정 없는 추적 파일은 git ls-files -s 의 index blob 해시를 그대로 쓰고(파일을 읽지 않아 빠르며 index 는 커밋으로 바뀌지 않습니다), 작업 트리가 index 와 다른 파일과 미추적 파일만 git hash-object 로 실제 내용을 해시합니다. 존재하지 않는 경로는 목록에서 제외해 삭제의 stage·commit 에도 불변입니다. lib/common.sh 정본과 stop-verify-gate.sh 폴백을 같은 정의로 맞췄습니다. 최초의 우회(커밋 뒤 verify 재실행)는 더 필요하지 않습니다. 
 recurrence_risk: high
 harness_element: HE-10
 proposed_harness_change: 지문을 커밋 불변으로 만듭니다. HEAD 기준 상대 표현 대신 작업 트리 파일의 내용 해시를 직접 모읍니다(git ls-files 와 미추적 목록에 각각 git hash-object). 대형 저장소에서 hook 시간 예산을 넘길 수 있으므로 비용을 먼저 측정하고, 넘으면 커밋 직후 1회 면제 같은 다른 처방을 검토합니다.
 preferred_enforcement: script
 trust: untrusted
-regression_check: 검증 → 커밋 → 종료 순서에서 게이트가 통과하는지, 검증 → 파일 수정 → 종료 순서에서 여전히 차단하는지 두 가지를 함께 확인합니다. 후자가 깨지면 이 처방은 기각입니다. 이 저장소와 파일 수천 개 규모 저장소에서 지문 계산 시간을 재고 30초 hook 예산과 비교합니다.
+regression_check: '기준: 검증 → 커밋 → 종료 순서에서 게이트가 통과하고, 검증 → 파일 수정 → 종료 순서에서 여전히 차단해야 합니다. 후자가 깨지면 기각. 수천 파일 규모에서 계산 시간이 30초 hook 예산 안이어야 합니다. 결과(2026-09-05, 커밋 0c38af8): 임시 저장소 12개 시나리오 전부 통과 — 감지 5종(파일 수정, 같은 파일 재수정, 미추적 추가, 미추적 수정, 추적 파일 삭제), 불변 4종(git add, git commit, 삭제 stage, 삭제 commit), 원복 2종, 구현 일치 1종(common.sh 정본 == hook 폴백, c8d19df6). 실제 저장소 종단 확인: git add 후 게이트 exit 0, git commit 후 재검증 없이 exit 0, 파일 1줄 수정 후 exit 2, 되돌린 뒤 exit 0. 비용: 추적 125개 0.44초, 1000개 0.57초, 5000개 2.2초, 5000개+더티 20개 3.1초로 전부 예산 안. 기각 조건 미발생.'
 owner: unassigned
 expires: 2026-12-31
