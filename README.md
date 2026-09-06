@@ -114,7 +114,7 @@ If you cannot answer "yes" and point at the evidence, it is not a self-improving
    ├─ improvement-log/        Schema, template and example for candidate lessons
    ├─ evaluation/             Rubric and task-set templates (with {{placeholders}})
    ├─ templates/              AGENTS.md / CLAUDE.md drafts to drop into a target project
-   └─ language/               Language packs: typescript, java, python, go, rust, _template
+   └─ language/               Language packs: typescript, java, python, go, rust, ruby, _template
 ```
 
 Two directories are easy to confuse:

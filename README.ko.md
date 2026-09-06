@@ -98,7 +98,7 @@ AI 코딩 에이전트가 일하는 *환경*을 만드는 킷입니다. 에이�
    ├─ improvement-log/        후보 lesson 의 스키마·템플릿·예시
    ├─ evaluation/             rubric 과 task 세트 템플릿 ({{자리표시자}} 유지)
    ├─ templates/              대상 프로젝트에 배치할 AGENTS.md / CLAUDE.md 초안
-   └─ language/               언어 팩: typescript, java, python, go, rust, _template
+   └─ language/               언어 팩: typescript, java, python, go, rust, ruby, _template
 ```
 
 혼동하기 쉬운 두 자리가 있습니다.

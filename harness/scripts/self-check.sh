@@ -158,7 +158,7 @@ if selected protection; then
       # 로 옮길 때 to_relative 의 이스케이프가 깨져 경로에서 "/" 를 전부 지웠고,
       # harness/scripts/*.sh 를 포함한 모든 경로 패턴이 빗나갔는데 이 검사는 통과했습니다.
       # 파일명 탐침만으로는 죽은 단언이 됩니다.
-      for p in tsconfig.json checkstyle.xml ruff.toml .golangci.yml clippy.toml \
+      for p in tsconfig.json checkstyle.xml ruff.toml .golangci.yml clippy.toml .rubocop.yml \
                harness/scripts/verify.sh harness/rules/RULES.md .harness/verify.json \
                .claude/settings.json .github/workflows/harness.yml; do
         c=0

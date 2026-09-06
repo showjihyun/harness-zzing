@@ -25,7 +25,7 @@
 
 | 추가된 것 | 왜 | 근거 |
 | --- | --- | --- |
-| `harness/language/` 언어 팩 5종 | 코어 문서와 스크립트가 Java·Spring 예시와 Node 설정 예시에 묶여 있어 다른 스택에 그대로 쓸 수 없었습니다. 언어 종속을 팩으로 분리하고 FE·BE 를 구분했습니다. | [improvement-log/2026-09-03-002.yaml](improvement-log/2026-09-03-002.yaml) |
+| `harness/language/` 언어 팩 6종 | 코어 문서와 스크립트가 Java·Spring 예시와 Node 설정 예시에 묶여 있어 다른 스택에 그대로 쓸 수 없었습니다. 언어 종속을 팩으로 분리하고 FE·BE 를 구분했습니다. | [improvement-log/2026-09-03-002.yaml](improvement-log/2026-09-03-002.yaml) |
 | 보호 패턴의 감지 무관 합집합 | 팩 분리 직후, 가드 훅의 언어별 보호가 스택 감지 성공에 의존해 감지 실패 저장소에서 보호가 조용히 사라졌습니다. 감지 결과와 무관하게 모든 팩의 패턴을 합칩니다. | [improvement-log/2026-09-03-001.yaml](improvement-log/2026-09-03-001.yaml) |
 | `harness/scripts/self-check.sh` | 팩의 계약을 문서로만 규정해 두어 계약 위반이 조용히 통과했습니다. 계약 검사를 `EL-5` 로 올린 새 번들 자산입니다. | [improvement-log/2026-09-03-002.yaml](improvement-log/2026-09-03-002.yaml) |
 | 팩 문서를 델타만 담도록 축소 | 팩 예시 문서가 코어를 복제해 같은 lesson 이 여러 자리에 정본으로 존재했고 이미 드리프트가 발생했습니다. | [improvement-log/2026-09-03-003.yaml](improvement-log/2026-09-03-003.yaml) |

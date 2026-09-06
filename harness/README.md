@@ -104,6 +104,10 @@ harness/
       README.md
       lang.sh
       backend/   (harness.config.example)
+    ruby/
+      README.md
+      lang.sh
+      backend/   (harness.config.example)
 ```
 
 `go` 와 `rust` 는 예시 문서가 없는 최소 팩입니다. 팩 문서는 관측된 필요가 생겼을 때만 만듭니다.

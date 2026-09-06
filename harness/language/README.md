@@ -40,7 +40,7 @@ language/
       improvement-log.example.yaml  ← 선택
 ```
 
-`examples.md` 와 `improvement-log.example.yaml` 은 **관측된 필요가 생겼을 때만** 만듭니다. 근거 없이 먼저 만들면 검증되지 않은 지침이 되어 읽는 비용만 늘립니다. `go` 와 `rust` 는 이 둘이 없는 최소 팩이며, 그 사실을 각 팩 README 가 밝힙니다.
+`examples.md` 와 `improvement-log.example.yaml` 은 **관측된 필요가 생겼을 때만** 만듭니다. 근거 없이 먼저 만들면 검증되지 않은 지침이 되어 읽는 비용만 늘립니다. `go`, `rust`, `ruby` 는 이 둘이 없는 최소 팩이며, 그 사실을 각 팩 README 가 밝힙니다.
 
 디렉터리 이름은 **언어 이름**입니다. 빌드 도구나 런타임 이름(`gradle`, `node`)을 쓰지 않습니다. 같은 언어 안에서 빌드 도구·패키지 매니저가 갈리는 것은 스택 ID 의 변형(`java:gradle`, `typescript:pnpm`)으로 표현합니다.
 
@@ -53,11 +53,11 @@ language/
 | `frontend` | 산출물이 브라우저(또는 웹뷰)에서 실행됩니다 | OBS-F1~F5 (browser, DOM, screenshot, console, network) | E2E, 번들 크기, 접근성 검사 |
 | `backend` | 산출물이 서버·CLI·배치·워커로 실행됩니다 | OBS-B1~B7 (integration test, curl, DB query, log, metric, trace, load) | 통합 테스트, 계약 테스트, 스키마 검증, 부하 테스트 |
 
-kind 는 `harness_lang_<언어>_kind` 가 정하고 `HARNESS_KIND` 로 재정의할 수 있습니다. 지금 프로젝트 파일을 실제로 읽어 판정하는 것은 `typescript` 뿐이고, 나머지 네 팩은 언제나 `backend` 를 냅니다. 두 kind 를 모두 담은 저장소는 `fullstack` 으로 판정되며 두 kind 의 단계를 합집합으로 씁니다. 판정할 근거가 없으면 `unknown` 이고 이때도 합집합을 씁니다.
+kind 는 `harness_lang_<언어>_kind` 가 정하고 `HARNESS_KIND` 로 재정의할 수 있습니다. 지금 프로젝트 파일을 실제로 읽어 판정하는 것은 `typescript` 뿐이고, 나머지 다섯 팩은 언제나 `backend` 를 냅니다. 두 kind 를 모두 담은 저장소는 `fullstack` 으로 판정되며 두 kind 의 단계를 합집합으로 씁니다. 판정할 근거가 없으면 `unknown` 이고 이때도 합집합을 씁니다.
 
 kind 는 **기본 verify 단계 선택에만** 영향을 줍니다. 보호 패턴은 kind 와 무관하게 전부 적용됩니다. kind 확정으로 제외된 단계가 있으면 `verify.sh` 가 그 목록을 출력합니다.
 
-현재 두 kind 를 모두 가진 언어는 `typescript` 뿐입니다. `java`, `python`, `go`, `rust` 는 `backend/` 만 갖습니다. 나중에 Kotlin/Android 나 Rust/WASM 처럼 다른 kind 가 생기면 그 언어 팩 아래에 디렉터리를 추가합니다. 관측 채널 ID(`OBS-*`)의 정의는 [../references/agent-observability.md](../references/agent-observability.md) 가 소유하고, 팩은 그 채널을 이 언어에서 어떤 명령으로 확보하는지만 적습니다.
+현재 두 kind 를 모두 가진 언어는 `typescript` 뿐입니다. `java`, `python`, `go`, `rust`, `ruby` 는 `backend/` 만 갖습니다. 나중에 Kotlin/Android 나 Rust/WASM 처럼 다른 kind 가 생기면 그 언어 팩 아래에 디렉터리를 추가합니다. 관측 채널 ID(`OBS-*`)의 정의는 [../references/agent-observability.md](../references/agent-observability.md) 가 소유하고, 팩은 그 채널을 이 언어에서 어떤 명령으로 확보하는지만 적습니다.
 
 ## 2. 팩 계약 (lang.sh)
 
@@ -95,7 +95,7 @@ harness/hooks/guard-evaluation-tampering.sh --list    # 합쳐진 보호 목록�
 1. `detect-stack.sh` 가 `language/*/lang.sh` 를 사전순으로 `source` 하고 계약을 검사합니다. `_` 로 시작하는 디렉터리는 건너뜁니다. 로드나 계약 검사에 실패한 팩은 제외되고 사유가 stderr 에 남습니다.
 2. `guard-evaluation-tampering.sh` 는 **감지하지 않고** 코어 보호 패턴에 로드된 모든 팩의 패턴(공통 + 모든 kind)을 합칩니다. `loop.sh` 도 모든 팩의 보안 패턴을 합칩니다.
 3. `verify.sh` 는 단계 선택을 위해 감지합니다. `HARNESS_STACK` 이 있으면 감지를 생략하고 그 값을 씁니다. 옛 형식(`node:pnpm`, `gradle`, `maven`)은 새 형식으로 바꿔 쓰고 경고를 남깁니다.
-4. 없으면 `HARNESS_LANG_DETECT_ORDER`(기본 `typescript java python go rust`) 순서로 감지 함수를 호출하고, **처음 감지된 스택**을 씁니다. 나머지 감지 결과는 `verify.sh` 가 "다른 후보" 로 표시합니다.
+4. 없으면 `HARNESS_LANG_DETECT_ORDER`(기본 `typescript java python go rust ruby`) 순서로 감지 함수를 호출하고, **처음 감지된 스택**을 씁니다. 나머지 감지 결과는 `verify.sh` 가 "다른 후보" 로 표시합니다.
 5. `HARNESS_KIND` 가 있으면 그 값을, 없으면 팩의 kind 함수 결과를 씁니다. kind 는 단계 선택에만 쓰이며 보호 목록을 바꾸지 않습니다.
 
 한 저장소에 두 언어가 있으면(예: `pom.xml` 과 `frontend/package.json`) **단계 선택**은 루트에서 감지되는 언어 하나만 따릅니다. 하위 디렉터리마다 `harness.config` 를 두고 `HARNESS_PROJECT_ROOT` 로 루트를 나누거나, 루트 `harness.config` 의 `HARNESS_STEPS` 에 두 언어의 단계를 직접 적습니다. **보호 목록은 이 제약을 받지 않습니다.** monorepo 에서도 `frontend/tsconfig.json` 과 `backend/checkstyle.xml` 이 함께 차단됩니다.
@@ -109,6 +109,7 @@ harness/hooks/guard-evaluation-tampering.sh --list    # 합쳐진 보호 목록�
 | [python](python/README.md) | `python`, `python:uv`, `python:poetry`, `python:pdm`, `python:pipenv` | `backend` | `pyproject.toml`, `requirements.txt`, `setup.py`, `setup.cfg`, `Pipfile` |
 | [go](go/README.md) | `go` | `backend` | `go.mod` |
 | [rust](rust/README.md) | `rust` | `backend` | `Cargo.toml` |
+| [ruby](ruby/README.md) | `ruby` | `backend` | `Gemfile`, `gems.rb` |
 
 `typescript` 팩은 JavaScript 전용 프로젝트도 담당합니다. 타입 검사 단계는 `package.json` 에 해당 스크립트가 있을 때만 생성되므로 JavaScript 프로젝트에서는 자연히 빠집니다.
 

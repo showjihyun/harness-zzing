@@ -10,7 +10,7 @@
 
 | 워크트리 | 변경 | 추정 과제 | 상태 |
 | --- | --- | --- | --- |
-| `aa4d29b` | `language/ruby/` 신설, `language/README.md`, `detect-stack.sh`, `self-check.sh`, `harness.config.example`, README 3종 | REP-1 | **판정 완료** → [2026-09-05-REP-1.md](2026-09-05-REP-1.md) |
+| `aa4d29b` | `language/ruby/` 신설, `language/README.md`, `detect-stack.sh`, `self-check.sh`, `harness.config.example`, README 3종 | REP-1 | **판정 완료** → [2026-09-05-REP-1.md](2026-09-05-REP-1.md). 산출물은 저장소로 회수됨 |
 | `abbcf96` | `improvement-log.sh` | REP-2 | 판정 불가 |
 | `a06e923` | `guard-evaluation-tampering.sh`, `hooks/README.md`, candidate 2건 | REP-4 또는 REP-8 | 판정 불가 |
 | `aa41af4` | 위와 같음 + `detect-stack.sh` | REP-4 또는 REP-8 | 판정 불가 |
