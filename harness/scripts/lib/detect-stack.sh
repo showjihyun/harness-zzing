@@ -36,7 +36,7 @@ HARNESS_LANG_PACK_PROBLEMS=0
 HARNESS_LANG_KINDS=(frontend backend)
 # 감지 우선순위 기본값. 앞의 팩이 먼저 검사되고 처음 감지된 스택이 채택됩니다.
 # 재정의는 HARNESS_LANG_DETECT_ORDER="java typescript" 처럼 공백 구분 문자열로 합니다.
-HARNESS_LANG_DETECT_ORDER_DEFAULT=(typescript java python go rust)
+HARNESS_LANG_DETECT_ORDER_DEFAULT=(typescript java python go rust ruby)
 
 # _emit_step <id> <layer> <required> <command…>
 # 팩이 사용합니다. 팩보다 먼저 정의되어야 하므로 로더 앞에 둡니다.

@@ -102,7 +102,7 @@ HARNESS_AGENT_CMD=""
 # HARNESS_STACK — 스택 자동 감지를 강제로 재정의합니다.
 #   영향을 받는 스크립트: verify.sh (기본 단계 선택). 보호 목록은 바꾸지 않습니다.
 #   값 형식: <언어>[:<변형>]. 예: typescript:pnpm, typescript:npm, typescript:yarn, typescript:bun,
-#            java:gradle, java:maven, python:uv, python:poetry, python:pdm, python:pipenv, python, go, rust
+#            java:gradle, java:maven, python:uv, python:poetry, python:pdm, python:pipenv, python, go, rust, ruby
 #   옛 값(node:pnpm, gradle, maven)은 자동으로 새 형식으로 해석되며 경고가 납니다.
 # HARNESS_KIND — FE/BE 자동 판정을 강제로 재정의합니다.
 #   값: frontend | backend | fullstack | unknown
@@ -113,7 +113,7 @@ HARNESS_AGENT_CMD=""
 #   또한 hook 은 이 파일을 읽지 않습니다. bash 파일을 가드 프로세스에서 실행하면
 #   한 줄로 가드를 무력화할 수 있기 때문입니다.
 # HARNESS_LANG_DETECT_ORDER — 여러 스택이 감지될 때 우선순위입니다. 공백 구분.
-#   기본값: "typescript java python go rust"
+#   기본값: "typescript java python go rust ruby"
 # HARNESS_PROJECT_ROOT — 프로젝트 루트 탐색을 강제로 재정의합니다.
 #   영향을 받는 스크립트: 모든 스크립트 (lib/common.sh 의 find_project_root)
 # HARNESS_SELF_CHECK_LINK_DIRS — self-check 의 links 검사에 프로젝트 문서를 더합니다.
